@@ -1,0 +1,816 @@
+{
+  "@@locale": "en",
+
+  "appName": "Jusoor",
+  "@appName": {
+    "description": "Application display name."
+  },
+
+  "appCancel": "Cancel",
+  "@appCancel": {
+    "description": "Generic cancel button label."
+  },
+
+  "appProceed": "Proceed",
+  "@appProceed": {
+    "description": "Generic proceed / continue button label."
+  },
+
+  "navHome": "Home",
+  "@navHome": {
+    "description": "Bottom navigation tab label for the home screen."
+  },
+
+  "navHistory": "History",
+  "@navHistory": {
+    "description": "Bottom navigation tab label for the history screen."
+  },
+
+  "navSettings": "Settings",
+  "@navSettings": {
+    "description": "Bottom navigation tab label for the settings screen."
+  },
+
+  "homeSelectTextTemplate": "Select text template",
+  "@homeSelectTextTemplate": {
+    "description": "Placeholder label for the text template selector before a template is picked."
+  },
+
+  "homeSelectImageTemplate": "Select image template",
+  "@homeSelectImageTemplate": {
+    "description": "Placeholder label for the image template selector before a template is picked."
+  },
+
+  "homeTextTemplateTitle": "Text Template",
+  "@homeTextTemplateTitle": {
+    "description": "Title of the bottom sheet that lets the user pick a text template."
+  },
+
+  "homeImageTemplateTitle": "Image Template",
+  "@homeImageTemplateTitle": {
+    "description": "Title of the bottom sheet that lets the user pick an image template."
+  },
+
+  "homeTargetLanguageHint": "Target",
+  "@homeTargetLanguageHint": {
+    "description": "Hint text shown inside the target language dropdown on the home screen."
+  },
+
+  "langRow_targetTooltip": "Target language",
+  "@langRow_targetTooltip": {
+    "description": "Accessibility / semantics label for the target language dropdown on the home screen."
+  },
+
+  "langAuto_selectTitle": "Select Language",
+  "@langAuto_selectTitle": {
+    "description": "Title of the bottom sheet shown when picking a language."
+  },
+
+  "langAuto_searchHint": "Search languages...",
+  "@langAuto_searchHint": {
+    "description": "Hint text of the search field inside the language picker sheet."
+  },
+
+  "homeInputHint": "Enter text to translate...",
+  "@homeInputHint": {
+    "description": "Placeholder text shown in the main input field on the home screen."
+  },
+
+  "homePasteTooltip": "Paste from clipboard",
+  "@homePasteTooltip": {
+    "description": "Tooltip for the paste-from-clipboard icon button."
+  },
+
+  "homePickImageTooltip": "Pick image",
+  "@homePickImageTooltip": {
+    "description": "Tooltip for the pick-image icon button."
+  },
+
+  "homeUploadFileTooltip": "Upload file",
+  "@homeUploadFileTooltip": {
+    "description": "Tooltip for the upload-file icon button."
+  },
+
+  "homeWordCount": "{count, plural, =0{0 words} one{1 word} other{{count} words}}",
+  "@homeWordCount": {
+    "description": "Word count chip shown below the input field.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "42"
+      }
+    }
+  },
+
+  "homeTranslateButton": "Translate",
+  "@homeTranslateButton": {
+    "description": "Primary action button label for starting a translation."
+  },
+
+  "homeClearButton": "Clear",
+  "@homeClearButton": {
+    "description": "Clear-input secondary button label."
+  },
+
+  "homeShareTooltip": "Share translation",
+  "@homeShareTooltip": {
+    "description": "Tooltip for the share-translation icon button."
+  },
+
+  "homeShareText": "Translation result",
+  "@homeShareText": {
+    "description": "Body text attached when the translation result is shared."
+  },
+
+  "homeShareSubject": "Jusoor Result",
+  "@homeShareSubject": {
+    "description": "Subject line used when the translation result is shared."
+  },
+
+  "homeOutputTitle": "Translation",
+  "@homeOutputTitle": {
+    "description": "Header shown above the translated output area."
+  },
+
+  "homeCopyTooltip": "Copy translation",
+  "@homeCopyTooltip": {
+    "description": "Tooltip for the copy-translation icon button."
+  },
+
+  "homeCopiedToClipboard": "Copied to clipboard",
+  "@homeCopiedToClipboard": {
+    "description": "Snackbar message shown after copying the translation."
+  },
+
+  "homeModelInfo": "Model: {model} \u00b7 {seconds}s",
+  "@homeModelInfo": {
+    "description": "Subtitle line shown under the translation output, naming the model and duration.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+
+  "homeWordLimitTitle": "Word Limit Exceeded",
+  "@homeWordLimitTitle": {
+    "description": "Title of the dialog shown when input exceeds the configured word limit."
+  },
+
+  "homeWordLimitBody": "Your text has {count} words, which exceeds the limit of {limit} words. Do you want to proceed anyway?",
+  "@homeWordLimitBody": {
+    "description": "Body of the word-limit dialog, asking the user to confirm proceeding.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+
+  "homeErrorSharedContent": "Could not read shared content.",
+  "@homeErrorSharedContent": {
+    "description": "Snackbar message when shared content cannot be parsed."
+  },
+
+  "homeErrorFileBytes": "Could not read file bytes.",
+  "@homeErrorFileBytes": {
+    "description": "Snackbar message when a picked file has no readable bytes."
+  },
+
+  "homeFileWillBeChunked": "File will be translated in chunks",
+  "@homeFileWillBeChunked": {
+    "description": "Snackbar message warning the user that a large file will be split into chunks."
+  },
+
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the settings screen and its AppBar."
+  },
+
+  "settingsApiKeys": "API Keys",
+  "@settingsApiKeys": {
+    "description": "Settings list-tile label that opens the API Keys screen."
+  },
+
+  "settingsProviderProfiles": "Provider Profiles",
+  "@settingsProviderProfiles": {
+    "description": "Settings list-tile label that opens the Provider Profiles screen."
+  },
+
+  "settingsTemplates": "Templates",
+  "@settingsTemplates": {
+    "description": "Settings list-tile label that opens the Templates screen."
+  },
+
+  "settingsSectionOverlay": "Overlay",
+  "@settingsSectionOverlay": {
+    "description": "Settings section header for the overlay-related options."
+  },
+
+  "settingsSectionGeneral": "General",
+  "@settingsSectionGeneral": {
+    "description": "Settings section header for general options."
+  },
+
+  "settingsSectionAdvanced": "Advanced",
+  "@settingsSectionAdvanced": {
+    "description": "Settings section header for advanced options."
+  },
+
+  "settingsDefaultTargetLanguage": "Default Target Language",
+  "@settingsDefaultTargetLanguage": {
+    "description": "Label for the default target language list-tile."
+  },
+
+  "settingsWordLimit": "Word Limit",
+  "@settingsWordLimit": {
+    "description": "Label for the word-limit text field."
+  },
+
+  "settingsWordLimitHint": "5000",
+  "@settingsWordLimitHint": {
+    "description": "Hint text shown inside the word-limit text field."
+  },
+
+  "settingsTargetLanguageHint": "Target language",
+  "@settingsTargetLanguageHint": {
+    "description": "Hint text shown inside the default-target-language dropdown."
+  },
+
+  "settingsAppLanguage": "App Language",
+  "@settingsAppLanguage": {
+    "description": "Label for the app-UI language list tile in Settings."
+  },
+
+  "settingsAppLanguageSystem": "System default",
+  "@settingsAppLanguageSystem": {
+    "description": "Option that makes the app UI follow the device's system language."
+  },
+
+  "settingsAppLanguageTitle": "App Language",
+  "@settingsAppLanguageTitle": {
+    "description": "Title of the bottom sheet for picking the app UI language."
+  },
+
+  "settingsFallbackProfile": "Fallback Profile",
+  "@settingsFallbackProfile": {
+    "description": "Label for the fallback-provider-profile dropdown."
+  },
+
+  "settingsNoneOption": "(None)",
+  "@settingsNoneOption": {
+    "description": "Dropdown option that explicitly selects no fallback profile."
+  },
+
+  "settingsRestoreBuiltIn": "Restore Built-in Items",
+  "@settingsRestoreBuiltIn": {
+    "description": "Button label that re-creates any missing built-in profiles and templates."
+  },
+
+  "settingsAlreadyPresent": "All built-in items are already present.",
+  "@settingsAlreadyPresent": {
+    "description": "Snackbar message shown when no built-ins needed restoration."
+  },
+
+  "settingsRestoredSnackbar": "Restored {profiles} profile(s) and {templates} template(s).",
+  "@settingsRestoredSnackbar": {
+    "description": "Snackbar message shown after restoring built-in items, with counts.",
+    "placeholders": {
+      "profiles": {
+        "type": "int"
+      },
+      "templates": {
+        "type": "int"
+      }
+    }
+  },
+
+  "settingsOverlayTemplate": "Overlay Template",
+  "@settingsOverlayTemplate": {
+    "description": "Label for the overlay-template selector."
+  },
+
+  "settingsSelectOverlayTemplate": "Select overlay template",
+  "@settingsSelectOverlayTemplate": {
+    "description": "Placeholder label for the overlay-template selector when nothing is chosen."
+  },
+
+  "settingsOverlayTemplateDescription": "Used for both text and image translation in the overlay.",
+  "@settingsOverlayTemplateDescription": {
+    "description": "Subtitle of the overlay-template picker explaining its role."
+  },
+
+  "settingsOverlayTextAndImage": "Text & Image",
+  "@settingsOverlayTextAndImage": {
+    "description": "Subtitle shown for a template that supports both text and image translation."
+  },
+
+  "settingsOverlayTextOnly": "Text only",
+  "@settingsOverlayTextOnly": {
+    "description": "Subtitle shown for a template that supports text translation only."
+  },
+
+  "settingsOverlayImageOnly": "Image only",
+  "@settingsOverlayImageOnly": {
+    "description": "Subtitle shown for a template that supports image translation only."
+  },
+
+  "settingsSizeMode": "Size Mode",
+  "@settingsSizeMode": {
+    "description": "Label for the overlay-size-mode selector."
+  },
+
+  "settingsOverlaySizeModeTitle": "Overlay Size Mode",
+  "@settingsOverlaySizeModeTitle": {
+    "description": "Title of the bottom sheet for picking the overlay size mode."
+  },
+
+  "settingsOverlaySizeModeDescription": "Choose how the overlay fills the screen.",
+  "@settingsOverlaySizeModeDescription": {
+    "description": "Subtitle of the overlay-size-mode bottom sheet."
+  },
+
+  "settingsOverlaySizeCompressed": "Compressed",
+  "@settingsOverlaySizeCompressed": {
+    "description": "Label for the compressed overlay-size option."
+  },
+
+  "settingsOverlaySizeFull": "Full",
+  "@settingsOverlaySizeFull": {
+    "description": "Label for the full overlay-size option."
+  },
+
+  "settingsOverlaySizeCompressedDescription": "Floating card in the center, ~75% of screen height. Dark background dims the rest.",
+  "@settingsOverlaySizeCompressedDescription": {
+    "description": "Subtitle for the compressed overlay-size option."
+  },
+
+  "settingsOverlaySizeFullDescription": "Fills the entire content area between status bar and navigation bar. No borders or shadow.",
+  "@settingsOverlaySizeFullDescription": {
+    "description": "Subtitle for the full overlay-size option."
+  },
+
+  "settingsSupport": "Support",
+  "@settingsSupport": {
+    "description": "Settings list-tile label that opens the Support screen."
+  },
+
+  "settingsPermissions": "Permissions",
+  "@settingsPermissions": {
+    "description": "Settings list-tile label that opens the Permissions screen."
+  },
+
+  "settingsInstructions": "Instructions",
+  "@settingsInstructions": {
+    "description": "Settings list-tile label that opens the Instructions screen."
+  },
+
+  "settingsSectionHelp": "Help & Support",
+  "@settingsSectionHelp": {
+    "description": "Settings section header for the help, support, and articles entries."
+  },
+
+  "settingsArticles": "Articles",
+  "@settingsArticles": {
+    "description": "Title of the articles list page and of the tile that opens it from Settings → Help & Support."
+  },
+
+  "settingsArticlesSubtitle": "Quick guides & how-it-works",
+  "@settingsArticlesSubtitle": {
+    "description": "Subtitle under the 'Articles' tile in Settings → Help & Support, describing what the page contains."
+  },
+
+  "articleLoadError": "Could not load the article.",
+  "@articleLoadError": {
+    "description": "Error message shown inside the article reader screen when its Markdown fails to load."
+  },
+
+  "articleRetry": "Retry",
+  "@articleRetry": {
+    "description": "Label for the retry button shown alongside the article load error on the reader screen."
+  },
+
+  "pagesSupportTitle": "Support Jusoor",
+  "@pagesSupportTitle": {
+    "description": "Title of the Support screen and its AppBar."
+  },
+
+  "pagesPatreonTitle": "Support on Patreon",
+  "@pagesPatreonTitle": {
+    "description": "Title of the Patreon support card on the Support screen."
+  },
+
+  "pagesPatreonSubtitle": "Become a member to help fund ongoing development and unlock supporter perks.",
+  "@pagesPatreonSubtitle": {
+    "description": "Subtitle of the Patreon support card on the Support screen."
+  },
+
+  "pagesGithubTitle": "Star on GitHub",
+  "@pagesGithubTitle": {
+    "description": "Title of the GitHub support card on the Support screen."
+  },
+
+  "pagesGithubSubtitle": "Show your support by starring the project and following new releases.",
+  "@pagesGithubSubtitle": {
+    "description": "Subtitle of the GitHub support card on the Support screen."
+  },
+
+  "pagesWebsiteTitle": "Website",
+  "@pagesWebsiteTitle": {
+    "description": "Title of the Website contact card on the Support screen."
+  },
+
+  "pagesWebsiteSubtitle": "Visit digitaltrekkerr.com for more about the project.",
+  "@pagesWebsiteSubtitle": {
+    "description": "Subtitle of the Website contact card on the Support screen."
+  },
+
+  "pagesEmailTitle": "Email",
+  "@pagesEmailTitle": {
+    "description": "Title of the Email contact card on the Support screen."
+  },
+
+  "pagesEmailSubtitle": "support@digitaltrekkerr.com",
+  "@pagesEmailSubtitle": {
+    "description": "Subtitle of the Email contact card on the Support screen."
+  },
+
+  "pagesOpeningLink": "Opening in your browser...",
+  "@pagesOpeningLink": {
+    "description": "Snackbar message shown when an external link is being opened."
+  },
+
+  "supportInvalidUrl": "Invalid URL",
+  "@supportInvalidUrl": {
+    "description": "Snackbar message shown when a support link cannot be parsed."
+  },
+
+  "pagesPermissionsTitle": "Permissions",
+  "@pagesPermissionsTitle": {
+    "description": "Title of the Permissions screen and its AppBar."
+  },
+
+  "pagesPermissionScreenCaptureTitle": "Screen capture (screenshot translation)",
+  "@pagesPermissionScreenCaptureTitle": {
+    "description": "Friendly title for the screen-capture / MediaProjection permission row."
+  },
+
+  "pagesPermissionScreenCaptureBody": "When you tap Screenshot in the overlay, Jusoor hides its own window and captures everything currently visible on the screen — including other apps — then sends that image to the translation provider you configured (e.g. OpenRouter/Gemini/OpenAI/custom) to translate the text in it. The image is not saved to your device; only the translated text is kept in History. Android shows a consent dialog before any capture, and capture stops when the overlay closes.",
+  "@pagesPermissionScreenCaptureBody": {
+    "description": "Explanation of the screen-capture / MediaProjection permission."
+  },
+
+  "pagesPermissionScreenCaptureGrant": "Try now",
+  "@pagesPermissionScreenCaptureGrant": {
+    "description": "Label for the Grant button on the screen-capture permission row."
+  },
+
+  "pagesPermissionOverlayTitle": "Overlay (Display over other apps)",
+  "@pagesPermissionOverlayTitle": {
+    "description": "Friendly title for the SYSTEM_ALERT_WINDOW permission row."
+  },
+
+  "pagesPermissionOverlayBody": "Jusoor draws its floating translation window on top of other apps. It opens only when you tap the Quick Settings 'Translate' tile or the overlay button. While it is open, touches inside the shaded top area are handled by the overlay; it never runs invisibly.",
+  "@pagesPermissionOverlayBody": {
+    "description": "Explanation of the SYSTEM_ALERT_WINDOW permission."
+  },
+
+  "pagesPermissionOverlayGrant": "Enable",
+  "@pagesPermissionOverlayGrant": {
+    "description": "Label for the Grant button on the overlay permission row."
+  },
+
+  "pagesPermissionNotificationsTitle": "Notifications",
+  "@pagesPermissionNotificationsTitle": {
+    "description": "Friendly title for the POST_NOTIFICATIONS permission row."
+  },
+
+  "pagesPermissionNotificationsBody": "Android requires a visible notification while the translation overlay service is running. This notification shows 'Translator Overlay is active' and disappears when the overlay closes. It is only used to keep the overlay alive.",
+  "@pagesPermissionNotificationsBody": {
+    "description": "Explanation of the POST_NOTIFICATIONS permission."
+  },
+
+  "pagesPermissionNotificationsGrant": "Enable",
+  "@pagesPermissionNotificationsGrant": {
+    "description": "Label for the Grant button on the notifications permission row."
+  },
+
+  "pagesPermissionFgsTitle": "Background service (overlay engine)",
+  "@pagesPermissionFgsTitle": {
+    "description": "Friendly title for the FOREGROUND_SERVICE permission row."
+  },
+
+  "pagesPermissionFgsBody": "A small background service keeps the overlay working while you use other apps. Android always shows it in the active-apps list with a notification. It starts when the overlay is opened and stops when the overlay is closed.",
+  "@pagesPermissionFgsBody": {
+    "description": "Explanation of the FOREGROUND_SERVICE permission."
+  },
+
+  "pagesPermissionInternetTitle": "Internet access",
+  "@pagesPermissionInternetTitle": {
+    "description": "Friendly title for the INTERNET permission row."
+  },
+
+  "pagesPermissionInternetBody": "Jusoor sends the content you translate (text you type, files you share, or screenshots) over an encrypted connection to the translation provider you chose in Settings. Anyone with your API key can read what is sent to that provider — keep your keys private and be mindful of what you translate.",
+  "@pagesPermissionInternetBody": {
+    "description": "Explanation of the INTERNET permission."
+  },
+
+  "pagesPermissionClipboardTitle": "Clipboard (Paste in the overlay)",
+  "@pagesPermissionClipboardTitle": {
+    "description": "Friendly title for the clipboard access description row."
+  },
+
+  "pagesPermissionClipboardBody": "The Paste button in the overlay reads your device clipboard so you can translate text copied from other apps. On modern Android this may briefly open a transparent window once, and Jusoor keeps the text in memory for up to a minute as a fallback. Cached content auto-clears after a minute. Nothing is stored permanently.",
+  "@pagesPermissionClipboardBody": {
+    "description": "Explanation of how the overlay accesses the clipboard."
+  },
+
+  "pagesPermissionShareTitle": "Share from other apps",
+  "@pagesPermissionShareTitle": {
+    "description": "Friendly title for the share-from-other-apps description row."
+  },
+
+  "pagesPermissionShareBody": "Any app can open Jusoor through the system Share menu to translate text, links or files. Shared content is uploaded to the translation provider for processing. This is how quick-translate works and cannot be disabled without losing the feature.",
+  "@pagesPermissionShareBody": {
+    "description": "Explanation of the share intent entry point."
+  },
+
+  "pagesPermissionQuickSettingsTitle": "Quick Settings 'Translate' tile",
+  "@pagesPermissionQuickSettingsTitle": {
+    "description": "Friendly title for the Quick Settings Tile description row."
+  },
+
+  "pagesPermissionQuickSettingsBody": "Jusoor adds a tile to your Quick Settings (Android 7+) that opens the overlay directly. Requires the overlay permission to be enabled.",
+  "@pagesPermissionQuickSettingsBody": {
+    "description": "Explanation of the Quick Settings Tile feature."
+  },
+
+  "pagesPermissionFilesTitle": "Importing files",
+  "@pagesPermissionFilesTitle": {
+    "description": "Friendly title for the file-import description row."
+  },
+
+  "pagesPermissionFilesBody": "Files are imported through the system file picker — you choose each file, and Jusoor never scans your storage. The chosen file's text is uploaded to the translation provider for translation.",
+  "@pagesPermissionFilesBody": {
+    "description": "Explanation of how file import works and its privacy implications."
+  },
+
+  "pagesGrantedAtInstall": "Granted at install",
+  "@pagesGrantedAtInstall": {
+    "description": "Status label shown for install-time permissions that cannot be revoked at runtime."
+  },
+
+  "pagesPermissionStatusGranted": "Granted",
+  "@pagesPermissionStatusGranted": {
+    "description": "Status label shown when a runtime permission is currently granted."
+  },
+
+  "pagesPermissionStatusDenied": "Not granted",
+  "@pagesPermissionStatusDenied": {
+    "description": "Status label shown when a runtime permission is denied or has not been requested."
+  },
+
+  "pagesPermissionStatusPermanent": "Permanently denied — open Settings",
+  "@pagesPermissionStatusPermanent": {
+    "description": "Status label shown when a runtime permission is permanently denied."
+  },
+
+  "pagesPermissionStatusInformational": "Always on",
+  "@pagesPermissionStatusInformational": {
+    "description": "Status label for non-grantable, informational permission rows."
+  },
+
+  "pagesPermissionOpenSettings": "Open Settings",
+  "@pagesPermissionOpenSettings": {
+    "description": "Label for the fallback button that opens the system app settings page."
+  },
+
+  "pagesPermissionSettingsHint": "If the system dialog does not appear, open Android Settings → Apps → Jusoor → Permissions.",
+  "@pagesPermissionSettingsHint": {
+    "description": "Hint shown beneath the Grant button as a fallback instruction."
+  },
+
+  "pagesInstructionsTitle": "Instructions",
+  "@pagesInstructionsTitle": {
+    "description": "Title of the Instructions screen and its AppBar."
+  },
+
+  "pagesHowToUseHeader": "How to use the app",
+  "@pagesHowToUseHeader": {
+    "description": "Section header for the app-usage instructions."
+  },
+
+  "pagesHowToUseStep1": "Open Jusoor and pick a source text or image template from the top of the Home screen.",
+  "@pagesHowToUseStep1": {
+    "description": "Step 1 of the how-to-use instructions."
+  },
+
+  "pagesHowToUseStep2": "Choose your target language, then type or paste text (or pick an image) in the input area.",
+  "@pagesHowToUseStep2": {
+    "description": "Step 2 of the how-to-use instructions."
+  },
+
+  "pagesHowToUseStep3": "Tap Translate to see the result below. You can copy, share, or open it in the full output view.",
+  "@pagesHowToUseStep3": {
+    "description": "Step 3 of the how-to-use instructions."
+  },
+
+  "pagesHowToUseStep4": "To translate from another app, use the system Share menu and pick Jusoor — text, links, and images are supported.",
+  "@pagesHowToUseStep4": {
+    "description": "Step 4 of the how-to-use instructions."
+  },
+
+  "pagesHowToUseStep5": "For a floating translator on top of any app, add the Quick Settings 'Translate' tile and tap it to open the overlay.",
+  "@pagesHowToUseStep5": {
+    "description": "Step 5 of the how-to-use instructions."
+  },
+
+  "pagesHowToWritePromptsHeader": "How to write good prompts",
+  "@pagesHowToWritePromptsHeader": {
+    "description": "Section header for prompt-writing tips."
+  },
+
+  "pagesHowToWritePromptsTip1": "State the desired tone and register (formal, casual, technical, marketing, etc.) so the model matches your audience.",
+  "@pagesHowToWritePromptsTip1": {
+    "description": "Tip 1 for writing good translation prompts."
+  },
+
+  "pagesHowToWritePromptsTip2": "Mention the domain (medical, legal, software, gaming) so the model uses the right vocabulary and conventions.",
+  "@pagesHowToWritePromptsTip2": {
+    "description": "Tip 2 for writing good translation prompts."
+  },
+
+  "pagesHowToWritePromptsTip3": "List any terms, brand names, or product names that must be kept untranslated.",
+  "@pagesHowToWritePromptsTip3": {
+    "description": "Tip 3 for writing good translation prompts."
+  },
+
+  "pagesHowToWritePromptsTip4": "Tell the model what to do with ambiguity: prefer literal, prefer natural, ask for clarification, or pick the most common reading.",
+  "@pagesHowToWritePromptsTip4": {
+    "description": "Tip 4 for writing good translation prompts."
+  },
+
+  "pagesHowToWritePromptsTip5": "Specify the output format you want: plain text, markdown, JSON, or line-by-line preserving the source structure.",
+  "@pagesHowToWritePromptsTip5": {
+    "description": "Tip 5 for writing good translation prompts."
+  },
+
+  "pagesHowToWritePromptsTip6": "Include short examples of the style you want — one or two before/after pairs are usually more effective than a long rule list.",
+  "@pagesHowToWritePromptsTip6": {
+    "description": "Tip 6 for writing good translation prompts."
+  },
+
+  "tplEditNewTitle": "New Template",
+  "@tplEditNewTitle": {
+    "description": "AppBar title of the template editor when creating a template."
+  },
+
+  "tplEditExistingTitle": "Edit Template",
+  "@tplEditExistingTitle": {
+    "description": "AppBar title of the template editor when editing an existing template."
+  },
+
+  "tplEditNameLabel": "Name",
+  "@tplEditNameLabel": {
+    "description": "Label of the template-name text field."
+  },
+
+  "tplEditNameHint": "e.g. Professional Translator",
+  "@tplEditNameHint": {
+    "description": "Hint text of the template-name text field."
+  },
+
+  "tplEditProfileLabel": "Profile",
+  "@tplEditProfileLabel": {
+    "description": "Label of the provider-profile dropdown in the template editor."
+  },
+
+  "tplEditSystemPromptLabel": "System Prompt",
+  "@tplEditSystemPromptLabel": {
+    "description": "Label of the system-prompt text field."
+  },
+
+  "tplEditWarningMissingTarget": "The system prompt does not contain {target_language}. Translations may not know which language to use.",
+  "@tplEditWarningMissingTarget": {
+    "description": "Warning banner shown when the prompt lacks the target-language placeholder.",
+    "placeholders": {
+      "target_language": {
+        "type": "String",
+        "example": "{{target_language}}"
+      }
+    }
+  },
+
+  "tplEditResetToDefault": "Reset to Default",
+  "@tplEditResetToDefault": {
+    "description": "Button label that restores the default system prompt."
+  },
+
+  "tplEditSupportsText": "Supports Text",
+  "@tplEditSupportsText": {
+    "description": "Title of the switch that enables text translation for the template."
+  },
+
+  "tplEditSupportsTextSubtitle": "This template can be used for text translation.",
+  "@tplEditSupportsTextSubtitle": {
+    "description": "Subtitle of the supports-text switch."
+  },
+
+  "tplEditSupportsImage": "Supports Image",
+  "@tplEditSupportsImage": {
+    "description": "Title of the switch that enables image translation for the template."
+  },
+
+  "tplEditSupportsImageSubtitle": "This template can be used for image/vision translation.",
+  "@tplEditSupportsImageSubtitle": {
+    "description": "Subtitle of the supports-image switch."
+  },
+
+  "tplSubTitle": "Auto-substitute target language",
+  "@tplSubTitle": {
+    "description": "Title of the switch that controls automatic substitution of the target language into the prompt."
+  },
+
+  "tplSubSubtitle": "Replace the {target_language} placeholder in the prompt with the chosen language before sending.",
+  "@tplSubSubtitle": {
+    "description": "Subtitle of the substitute-target-language switch.",
+    "placeholders": {
+      "target_language": {
+        "type": "String",
+        "example": "{{target_language}}"
+      }
+    }
+  },
+
+  "tplEditSaveButton": "Save",
+  "@tplEditSaveButton": {
+    "description": "Label of the floating save button in the template editor."
+  },
+
+  "tplEditErrorNameRequired": "Template name is required.",
+  "@tplEditErrorNameRequired": {
+    "description": "Snackbar error when saving a template without a name."
+  },
+
+  "tplEditErrorProfileRequired": "Please select a profile.",
+  "@tplEditErrorProfileRequired": {
+    "description": "Snackbar error when saving a template without a provider profile."
+  },
+
+  "tplEditErrorPromptRequired": "System prompt is required.",
+  "@tplEditErrorPromptRequired": {
+    "description": "Snackbar error when saving a template without a system prompt."
+  },
+
+  "tplEditErrorCapabilityRequired": "Enable at least one capability (Text or Image).",
+  "@tplEditErrorCapabilityRequired": {
+    "description": "Snackbar error when saving a template with both capabilities disabled."
+  },
+
+  "settingsThemeMode": "Theme",
+  "@settingsThemeMode": {
+    "description": "Label for the theme-mode selector (system / light / dark) in Settings."
+  },
+
+  "themeSystem": "System",
+  "@themeSystem": {
+    "description": "Theme option that follows the device's system brightness setting."
+  },
+
+  "themeLight": "Light",
+  "@themeLight": {
+    "description": "Theme option that forces a light color scheme regardless of system setting."
+  },
+
+  "themeDark": "Dark",
+  "@themeDark": {
+    "description": "Theme option that forces a dark color scheme regardless of system setting."
+  },
+
+  "updateAvailableTitle": "Update available",
+  "@updateAvailableTitle": {
+    "description": "Title of the banner shown at the top of Settings when a newer GitHub release exists."
+  },
+
+  "updateAvailableAction": "Download",
+  "@updateAvailableAction": {
+    "description": "Action button on the update-available banner that opens the GitHub release page in the browser."
+  },
+
+  "updateAvailableSubtitle": "Version {version} is available.",
+  "@updateAvailableSubtitle": {
+    "description": "Subtitle of the update-available banner, naming the latest release version.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "0.1.6"
+      }
+    }
+  }
+}

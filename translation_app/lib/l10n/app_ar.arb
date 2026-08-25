@@ -1,0 +1,816 @@
+{
+  "@@locale": "ar",
+
+  "appName": "جسور",
+  "@appName": {
+    "description": "اسم التطبيق الظاهر للمستخدم."
+  },
+
+  "appCancel": "إلغاء",
+  "@appCancel": {
+    "description": "تسمية زر الإلغاء العامة."
+  },
+
+  "appProceed": "متابعة",
+  "@appProceed": {
+    "description": "تسمية زر المتابعة العامة."
+  },
+
+  "navHome": "الرئيسية",
+  "@navHome": {
+    "description": "تسمية تبويب الشاشة الرئيسية في شريط التنقل السفلي."
+  },
+
+  "navHistory": "السجل",
+  "@navHistory": {
+    "description": "تسمية تبويب شاشة السجل في شريط التنقل السفلي."
+  },
+
+  "navSettings": "الإعدادات",
+  "@navSettings": {
+    "description": "تسمية تبويب شاشة الإعدادات في شريط التنقل السفلي."
+  },
+
+  "homeSelectTextTemplate": "اختر قالب النص",
+  "@homeSelectTextTemplate": {
+    "description": "نص مؤقت يظهر في محدد قالب النص قبل اختيار قالب."
+  },
+
+  "homeSelectImageTemplate": "اختر قالب الصورة",
+  "@homeSelectImageTemplate": {
+    "description": "نص مؤقت يظهر في محدد قالب الصورة قبل اختيار قالب."
+  },
+
+  "homeTextTemplateTitle": "قالب النص",
+  "@homeTextTemplateTitle": {
+    "description": "عنوان القائمة السفلية لاختيار قالب النص."
+  },
+
+  "homeImageTemplateTitle": "قالب الصورة",
+  "@homeImageTemplateTitle": {
+    "description": "عنوان القائمة السفلية لاختيار قالب الصورة."
+  },
+
+  "homeTargetLanguageHint": "اللغة الهدف",
+  "@homeTargetLanguageHint": {
+    "description": "نص تلميح داخل قائمة اللغة الهدف في الشاشة الرئيسية."
+  },
+
+  "langRow_targetTooltip": "لغة الهدف",
+  "@langRow_targetTooltip": {
+    "description": "تسمية إمكانية الوصول / الدلالية لقائمة لغة الهدف في الشاشة الرئيسية."
+  },
+
+  "langAuto_selectTitle": "اختر اللغة",
+  "@langAuto_selectTitle": {
+    "description": "عنوان القائمة السفلية لاختيار اللغة."
+  },
+
+  "langAuto_searchHint": "البحث عن لغة...",
+  "@langAuto_searchHint": {
+    "description": "نص تلميح حقل البحث داخل قائمة اختيار اللغة."
+  },
+
+  "homeInputHint": "أدخل النص للترجمة...",
+  "@homeInputHint": {
+    "description": "النص المؤقت داخل حقل الإدخال الرئيسي في الشاشة الرئيسية."
+  },
+
+  "homePasteTooltip": "لصق من الحافظة",
+  "@homePasteTooltip": {
+    "description": "تلميح أيقونة اللصق من الحافظة."
+  },
+
+  "homePickImageTooltip": "اختيار صورة",
+  "@homePickImageTooltip": {
+    "description": "تلميح أيقونة اختيار صورة."
+  },
+
+  "homeUploadFileTooltip": "رفع ملف",
+  "@homeUploadFileTooltip": {
+    "description": "تلميح أيقونة رفع ملف."
+  },
+
+  "homeWordCount": "{count, plural, =0{لا توجد كلمات} one{كلمة واحدة} two{كلمتان} few{{count} كلمات} many{{count} كلمة} other{{count} كلمة}}",
+  "@homeWordCount": {
+    "description": "عداد الكلمات أسفل حقل الإدخال.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "42"
+      }
+    }
+  },
+
+  "homeTranslateButton": "ترجمة",
+  "@homeTranslateButton": {
+    "description": "تسمية زر الترجمة الرئيسي."
+  },
+
+  "homeClearButton": "مسح",
+  "@homeClearButton": {
+    "description": "تسمية زر مسح الإدخال."
+  },
+
+  "homeShareTooltip": "مشاركة الترجمة",
+  "@homeShareTooltip": {
+    "description": "تلميح أيقونة مشاركة الترجمة."
+  },
+
+  "homeShareText": "نتيجة الترجمة",
+  "@homeShareText": {
+    "description": "النص المرفق عند مشاركة نتيجة الترجمة."
+  },
+
+  "homeShareSubject": "نتيجة جسور",
+  "@homeShareSubject": {
+    "description": "سطر الموضوع المستخدم عند مشاركة نتيجة الترجمة."
+  },
+
+  "homeOutputTitle": "الترجمة",
+  "@homeOutputTitle": {
+    "description": "العنوان فوق منطقة الترجمة الناتجة."
+  },
+
+  "homeCopyTooltip": "نسخ الترجمة",
+  "@homeCopyTooltip": {
+    "description": "تلميح أيقونة نسخ الترجمة."
+  },
+
+  "homeCopiedToClipboard": "تم النسخ إلى الحافظة",
+  "@homeCopiedToClipboard": {
+    "description": "رسالة SnackBar بعد نسخ الترجمة."
+  },
+
+  "homeModelInfo": "النموذج: {model} \u00b7 {seconds} ثانية",
+  "@homeModelInfo": {
+    "description": "سطر وصفي تحت الترجمة يعرض اسم النموذج ومدة الترجمة.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+
+  "homeWordLimitTitle": "تم تجاوز حد الكلمات",
+  "@homeWordLimitTitle": {
+    "description": "عنوان مربع الحوار عند تجاوز حد الكلمات."
+  },
+
+  "homeWordLimitBody": "نصّك يحتوي على {count} كلمة، وهذا يتجاوز الحد المسموح به وهو {limit} كلمة. هل تريد المتابعة؟",
+  "@homeWordLimitBody": {
+    "description": "نص مربع حوار حد الكلمات يطلب تأكيد المتابعة.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+
+  "homeErrorSharedContent": "تعذّر قراءة المحتوى المُشارك.",
+  "@homeErrorSharedContent": {
+    "description": "رسالة SnackBar عند تعذّر تحليل المحتوى المُشارك."
+  },
+
+  "homeErrorFileBytes": "تعذّر قراءة بيانات الملف.",
+  "@homeErrorFileBytes": {
+    "description": "رسالة SnackBar عند عدم احتواء الملف المختار على بيانات مقروءة."
+  },
+
+  "homeFileWillBeChunked": "سيتم ترجمة الملف على دفعات",
+  "@homeFileWillBeChunked": {
+    "description": "رسالة SnackBar تنبّه المستخدم إلى أن الملف الكبير سيُقسَّم إلى دفعات."
+  },
+
+  "settingsTitle": "الإعدادات",
+  "@settingsTitle": {
+    "description": "عنوان شاشة الإعدادات و AppBar الخاص بها."
+  },
+
+  "settingsApiKeys": "مفاتيح API",
+  "@settingsApiKeys": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة مفاتيح API."
+  },
+
+  "settingsProviderProfiles": "ملفات الموفّر",
+  "@settingsProviderProfiles": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة ملفات الموفّر."
+  },
+
+  "settingsTemplates": "القوالب",
+  "@settingsTemplates": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة القوالب."
+  },
+
+  "settingsSectionOverlay": "الترجمة العائمة",
+  "@settingsSectionOverlay": {
+    "description": "عنوان قسم إعدادات الترجمة العائمة."
+  },
+
+  "settingsSectionGeneral": "عام",
+  "@settingsSectionGeneral": {
+    "description": "عنوان قسم الإعدادات العامة."
+  },
+
+  "settingsSectionAdvanced": "متقدّم",
+  "@settingsSectionAdvanced": {
+    "description": "عنوان قسم الإعدادات المتقدمة."
+  },
+
+  "settingsDefaultTargetLanguage": "اللغة الهدف الافتراضية",
+  "@settingsDefaultTargetLanguage": {
+    "description": "تسمية عنصر اللغة الهدف الافتراضية."
+  },
+
+  "settingsWordLimit": "حد الكلمات",
+  "@settingsWordLimit": {
+    "description": "تسمية حقل حد الكلمات."
+  },
+
+  "settingsWordLimitHint": "5000",
+  "@settingsWordLimitHint": {
+    "description": "نص التلميح داخل حقل حد الكلمات."
+  },
+
+  "settingsTargetLanguageHint": "لغة الهدف",
+  "@settingsTargetLanguageHint": {
+    "description": "نص تلميح داخل قائمة اللغة الهدف الافتراضية."
+  },
+
+  "settingsAppLanguage": "لغة التطبيق",
+  "@settingsAppLanguage": {
+    "description": "تسمية صف لغة واجهة التطبيق في الإعدادات."
+  },
+
+  "settingsAppLanguageSystem": "حسب النظام",
+  "@settingsAppLanguageSystem": {
+    "description": "خيار يجعل واجهة التطبيق تتبع لغة نظام الجهاز."
+  },
+
+  "settingsAppLanguageTitle": "لغة التطبيق",
+  "@settingsAppLanguageTitle": {
+    "description": "عنوان النافذة السفلية لاختيار لغة الواجهة."
+  },
+
+  "settingsFallbackProfile": "ملف الموفّر البديل",
+  "@settingsFallbackProfile": {
+    "description": "تسمية قائمة ملف الموفّر البديل."
+  },
+
+  "settingsNoneOption": "(بلا)",
+  "@settingsNoneOption": {
+    "description": "خيار القائمة التي تختار صراحةً عدم وجود ملف بديل."
+  },
+
+  "settingsRestoreBuiltIn": "استعادة العناصر المضمّنة",
+  "@settingsRestoreBuiltIn": {
+    "description": "تسمية زر استعادة ملفات الموفّر والقوالب المضمّنة المفقودة."
+  },
+
+  "settingsAlreadyPresent": "جميع العناصر المضمّنة موجودة بالفعل.",
+  "@settingsAlreadyPresent": {
+    "description": "رسالة SnackBar عند عدم الحاجة إلى استعادة أي عنصر مضمّن."
+  },
+
+  "settingsRestoredSnackbar": "تمت استعادة {profiles} ملف(ات) و{templates} قالب(ات).",
+  "@settingsRestoredSnackbar": {
+    "description": "رسالة SnackBar بعد استعادة العناصر المضمّنة مع عرض الأعداد.",
+    "placeholders": {
+      "profiles": {
+        "type": "int"
+      },
+      "templates": {
+        "type": "int"
+      }
+    }
+  },
+
+  "settingsOverlayTemplate": "قالب الترجمة العائمة",
+  "@settingsOverlayTemplate": {
+    "description": "تسمية محدد قالب الترجمة العائمة."
+  },
+
+  "settingsSelectOverlayTemplate": "اختر قالب الترجمة العائمة",
+  "@settingsSelectOverlayTemplate": {
+    "description": "نص مؤقت لمحدد قالب الترجمة العائمة قبل الاختيار."
+  },
+
+  "settingsOverlayTemplateDescription": "يُستخدم لترجمة النصوص والصور داخل النافذة العائمة.",
+  "@settingsOverlayTemplateDescription": {
+    "description": "وصف مختصر في قائمة اختيار قالب الترجمة العائمة."
+  },
+
+  "settingsOverlayTextAndImage": "نص وصورة",
+  "@settingsOverlayTextAndImage": {
+    "description": "وصف يظهر للقالب الذي يدعم ترجمة النصوص والصور معاً."
+  },
+
+  "settingsOverlayTextOnly": "نص فقط",
+  "@settingsOverlayTextOnly": {
+    "description": "وصف يظهر للقالب الذي يدعم ترجمة النصوص فقط."
+  },
+
+  "settingsOverlayImageOnly": "صورة فقط",
+  "@settingsOverlayImageOnly": {
+    "description": "وصف يظهر للقالب الذي يدعم ترجمة الصور فقط."
+  },
+
+  "settingsSizeMode": "وضع الحجم",
+  "@settingsSizeMode": {
+    "description": "تسمية محدد وضع حجم الترجمة العائمة."
+  },
+
+  "settingsOverlaySizeModeTitle": "وضع حجم الترجمة العائمة",
+  "@settingsOverlaySizeModeTitle": {
+    "description": "عنوان القائمة السفلية لاختيار وضع حجم الترجمة العائمة."
+  },
+
+  "settingsOverlaySizeModeDescription": "اختر كيفية ملء الترجمة العائمة لشاشة الجهاز.",
+  "@settingsOverlaySizeModeDescription": {
+    "description": "وصف مختصر في قائمة اختيار وضع حجم الترجمة العائمة."
+  },
+
+  "settingsOverlaySizeCompressed": "مضغوط",
+  "@settingsOverlaySizeCompressed": {
+    "description": "تسمية خيار الحجم المضغوط للترجمة العائمة."
+  },
+
+  "settingsOverlaySizeFull": "كامل",
+  "@settingsOverlaySizeFull": {
+    "description": "تسمية خيار الحجم الكامل للترجمة العائمة."
+  },
+
+  "settingsOverlaySizeCompressedDescription": "بطاقة عائمة في المنتصف تشغل نحو 75% من ارتفاع الشاشة، مع تعتيم بقية الخلفية.",
+  "@settingsOverlaySizeCompressedDescription": {
+    "description": "وصف خيار الحجم المضغوط للترجمة العائمة."
+  },
+
+  "settingsOverlaySizeFullDescription": "تملأ الترجمة العائمة كامل المساحة بين شريط الحالة وشريط التنقل، دون حدود أو ظلال.",
+  "@settingsOverlaySizeFullDescription": {
+    "description": "وصف خيار الحجم الكامل للترجمة العائمة."
+  },
+
+  "settingsSupport": "الدعم",
+  "@settingsSupport": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة الدعم."
+  },
+
+  "settingsPermissions": "الأذونات",
+  "@settingsPermissions": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة الأذونات."
+  },
+
+  "settingsInstructions": "التعليمات",
+  "@settingsInstructions": {
+    "description": "تسمية عنصر الإعدادات الذي يفتح شاشة التعليمات."
+  },
+
+  "settingsSectionHelp": "المساعدة والدعم",
+  "@settingsSectionHelp": {
+    "description": "عنوان قسم المساعدة والدعم والمقالات في الإعدادات."
+  },
+
+  "settingsArticles": "مقالات",
+  "@settingsArticles": {
+    "description": "عنوان صفحة قائمة المقالات والعنوان الذي يفتحها من الإعدادات → المساعدة والدعم."
+  },
+
+  "settingsArticlesSubtitle": "أدلة سريعة وشروحات",
+  "@settingsArticlesSubtitle": {
+    "description": "وصف فرعي تحت tile 'مقالات' في الإعدادات → المساعدة والدعم، يوضح محتوى الصفحة."
+  },
+
+  "articleLoadError": "تعذّر تحميل المقال.",
+  "@articleLoadError": {
+    "description": "رسالة خطأ تظهر داخل شاشة قراءة المقال عند فشل تحميل ملف Markdown."
+  },
+
+  "articleRetry": "إعادة المحاولة",
+  "@articleRetry": {
+    "description": "تسمية زر إعادة المحاولة الذي يظهر مع رسالة فشل تحميل المقال في شاشة القراءة."
+  },
+
+  "pagesSupportTitle": "دعم جسور",
+  "@pagesSupportTitle": {
+    "description": "عنوان شاشة الدعم و AppBar الخاص بها."
+  },
+
+  "pagesPatreonTitle": "ادعمنا عبر Patreon",
+  "@pagesPatreonTitle": {
+    "description": "عنوان بطاقة دعم Patreon في شاشة الدعم."
+  },
+
+  "pagesPatreonSubtitle": "انضم كعضوٍ داعم للمساهمة في تمويل التطوير المستمر والحصول على مزايا حصرية للداعمين.",
+  "@pagesPatreonSubtitle": {
+    "description": "وصف بطاقة دعم Patreon في شاشة الدعم."
+  },
+
+  "pagesGithubTitle": "أعطنا نجمة على GitHub",
+  "@pagesGithubTitle": {
+    "description": "عنوان بطاقة دعم GitHub في شاشة الدعم."
+  },
+
+  "pagesGithubSubtitle": "أظهر دعمك للمشروع بوضع نجمة عليه ومتابعة الإصدارات الجديدة.",
+  "@pagesGithubSubtitle": {
+    "description": "وصف بطاقة دعم GitHub في شاشة الدعم."
+  },
+
+  "pagesWebsiteTitle": "الموقع",
+  "@pagesWebsiteTitle": {
+    "description": "عنوان بطاقة التواصل عبر الموقع في شاشة الدعم."
+  },
+
+  "pagesWebsiteSubtitle": "تفضل بزيارة digitaltrekkerr.com لمعرفة المزيد عن المشروع.",
+  "@pagesWebsiteSubtitle": {
+    "description": "وصف بطاقة التواصل عبر الموقع في شاشة الدعم."
+  },
+
+  "pagesEmailTitle": "البريد",
+  "@pagesEmailTitle": {
+    "description": "عنوان بطاقة التواصل عبر البريد في شاشة الدعم."
+  },
+
+  "pagesEmailSubtitle": "support@digitaltrekkerr.com",
+  "@pagesEmailSubtitle": {
+    "description": "وصف بطاقة التواصل عبر البريد في شاشة الدعم."
+  },
+
+  "pagesOpeningLink": "يتم الفتح في المتصفح...",
+  "@pagesOpeningLink": {
+    "description": "رسالة SnackBar عند فتح رابط خارجي."
+  },
+
+  "supportInvalidUrl": "رابط غير صالح",
+  "@supportInvalidUrl": {
+    "description": "رسالة SnackBar عند تعذّر تحليل رابط الدعم."
+  },
+
+  "pagesPermissionsTitle": "الأذونات",
+  "@pagesPermissionsTitle": {
+    "description": "عنوان شاشة الأذونات و AppBar الخاص بها."
+  },
+
+  "pagesPermissionScreenCaptureTitle": "التقاط الشاشة (ترجمة لقطات الشاشة)",
+  "@pagesPermissionScreenCaptureTitle": {
+    "description": "عنوان ودود لصف إذن التقاط الشاشة / MediaProjection."
+  },
+
+  "pagesPermissionScreenCaptureBody": "عند النقر على زر \"لقطة شاشة\" في النافذة العائمة، يُخفي جسور نافذته ويلتقط كل ما هو ظاهر على الشاشة — بما في ذلك التطبيقات الأخرى — ثم يُرسل هذه الصورة إلى مزوّد الترجمة الذي ضبطته (مثل OpenRouter أو Gemini أو OpenAI أو مزوّد مخصّص) لترجمة النصوص الموجودة فيها. لا تُحفظ الصورة على جهازك؛ يُحفظ النص المترجَم فقط في السجل. يعرض أندرويد مربع موافقة قبل أي التقاط، ويتوقف الالتقاط عند إغلاق النافذة العائمة.",
+  "@pagesPermissionScreenCaptureBody": {
+    "description": "شرح إذن التقاط الشاشة / MediaProjection."
+  },
+
+  "pagesPermissionScreenCaptureGrant": "جرّب الآن",
+  "@pagesPermissionScreenCaptureGrant": {
+    "description": "تسمية زر المنح في صف إذن التقاط الشاشة."
+  },
+
+  "pagesPermissionOverlayTitle": "العرض فوق التطبيقات (النافذة العائمة)",
+  "@pagesPermissionOverlayTitle": {
+    "description": "عنوان ودود لصف إذن SYSTEM_ALERT_WINDOW."
+  },
+
+  "pagesPermissionOverlayBody": "يرسم جسور نافذة الترجمة العائمة فوق التطبيقات الأخرى. لا تُفتح إلا عند النقر على بلاطة \"ترجم\" في الإعدادات السريعة أو على زر النافذة العائمة. أثناء فتحها، تُعالَج اللمسات داخل المنطقة المظللة العليا بواسطة النافذة العائمة؛ ولا تعمل أبداً بشكل مخفي.",
+  "@pagesPermissionOverlayBody": {
+    "description": "شرح إذن SYSTEM_ALERT_WINDOW."
+  },
+
+  "pagesPermissionOverlayGrant": "تفعيل",
+  "@pagesPermissionOverlayGrant": {
+    "description": "تسمية زر المنح في صف إذن النافذة العائمة."
+  },
+
+  "pagesPermissionNotificationsTitle": "الإشعارات",
+  "@pagesPermissionNotificationsTitle": {
+    "description": "عنوان ودود لصف إذن POST_NOTIFICATIONS."
+  },
+
+  "pagesPermissionNotificationsBody": "يتطلب أندرويد إشعاراً مرئياً أثناء تشغيل خدمة النافذة العائمة للترجمة. يعرض هذا الإشعار عبارة \"النافذة العائمة للترجمة نشطة\" ويختفي عند إغلاق النافذة العائمة. يُستخدم فقط لإبقاء النافذة العائمة حيّة.",
+  "@pagesPermissionNotificationsBody": {
+    "description": "شرح إذن POST_NOTIFICATIONS."
+  },
+
+  "pagesPermissionNotificationsGrant": "تفعيل",
+  "@pagesPermissionNotificationsGrant": {
+    "description": "تسمية زر المنح في صف إذن الإشعارات."
+  },
+
+  "pagesPermissionFgsTitle": "الخدمة الخلفية (محرّك النافذة العائمة)",
+  "@pagesPermissionFgsTitle": {
+    "description": "عنوان ودود لصف إذن FOREGROUND_SERVICE."
+  },
+
+  "pagesPermissionFgsBody": "تبقي خدمة خلفية صغيرة النافذة العائمة تعمل أثناء استخدامك لتطبيقات أخرى. يعرضها أندرويد دائماً في قائمة التطبيقات النشطة مع إشعار. تبدأ عند فتح النافذة العائمة وتتوقف عند إغلاقها.",
+  "@pagesPermissionFgsBody": {
+    "description": "شرح إذن FOREGROUND_SERVICE."
+  },
+
+  "pagesPermissionInternetTitle": "الوصول إلى الإنترنت",
+  "@pagesPermissionInternetTitle": {
+    "description": "عنوان ودود لصف إذن INTERNET."
+  },
+
+  "pagesPermissionInternetBody": "يُرسل جسور المحتوى الذي تترجمه (النصّ الذي تكتبه، أو الملفات التي تشاركها، أو لقطات الشاشة) عبر اتصالٍ مشفّر إلى مزوّد الترجمة الذي اخترته في الإعدادات. أي شخصٍ يملك مفتاح API الخاص بك يمكنه قراءة ما يُرسَل إلى ذلك المزوّد — فاحرص على سرّية مفاتيحك وانتبه لما تترجمه.",
+  "@pagesPermissionInternetBody": {
+    "description": "شرح إذن INTERNET."
+  },
+
+  "pagesPermissionClipboardTitle": "الحافظة (اللصق في النافذة العائمة)",
+  "@pagesPermissionClipboardTitle": {
+    "description": "عنوان ودود لصف وصف الوصول إلى الحافظة."
+  },
+
+  "pagesPermissionClipboardBody": "يقرأ زر \"لصق\" في النافذة العائمة محتوى حافظة جهازك لتترجم النصوص المنسوخة من تطبيقات أخرى. في الإصدارات الحديثة من أندرويد قد يُفتح لفترة وجيزة نافذة شفافة مرةً واحدة، ويحتفظ جسور بالنص في الذاكرة لدقيقة واحدة كحد أقصى كاحتياط. يُمسَح المحتوى المخزَّن مؤقتًا تلقائيًا بعد مرور دقيقة. لا يُخزَّن أي شيء بشكل دائم.",
+  "@pagesPermissionClipboardBody": {
+    "description": "شرح كيفية وصول النافذة العائمة إلى الحافظة."
+  },
+
+  "pagesPermissionShareTitle": "المشاركة من تطبيقات أخرى",
+  "@pagesPermissionShareTitle": {
+    "description": "عنوان ودود لصف وصف مدخل المشاركة."
+  },
+
+  "pagesPermissionShareBody": "يمكن لأي تطبيق فتح جسور عبر قائمة المشاركة في النظام لترجمة النصوص أو الروابط أو الملفات. يُرسَل المحتوى المُشارك إلى مزوّد الترجمة لمعالجته. هذه هي طريقة الترجمة السريعة ولا يمكن تعطيلها دون فقدان هذه الميزة.",
+  "@pagesPermissionShareBody": {
+    "description": "شرح مدخل نية المشاركة."
+  },
+
+  "pagesPermissionQuickSettingsTitle": "بلاطة \"ترجم\" في الإعدادات السريعة",
+  "@pagesPermissionQuickSettingsTitle": {
+    "description": "عنوان ودود لصف وصف بلاطة الإعدادات السريعة."
+  },
+
+  "pagesPermissionQuickSettingsBody": "يضيف جسور بلاطةً إلى الإعدادات السريعة (أندرويد 7 وما فوق) لفتح النافذة العائمة مباشرةً. تتطلّب تفعيل إذن النافذة العائمة.",
+  "@pagesPermissionQuickSettingsBody": {
+    "description": "شرح ميزة بلاطة الإعدادات السريعة."
+  },
+
+  "pagesPermissionFilesTitle": "استيراد الملفات",
+  "@pagesPermissionFilesTitle": {
+    "description": "عنوان ودود لصف وصف استيراد الملفات."
+  },
+
+  "pagesPermissionFilesBody": "تُستورد الملفات عبر منتقي ملفات النظام — أنت من يختار كل ملف، ولا يفحص جسور مساحة التخزين لديك إطلاقاً. يُرسَل نص الملف المختار إلى مزوّد الترجمة لترجمته.",
+  "@pagesPermissionFilesBody": {
+    "description": "شرح طريقة عمل استيراد الملفات وآثارها على الخصوصية."
+  },
+
+  "pagesGrantedAtInstall": "ممنوح عند التثبيت",
+  "@pagesGrantedAtInstall": {
+    "description": "تسمية الحالة للأذونات الممنوحة وقت التثبيت ولا يمكن إلغاؤها أثناء التشغيل."
+  },
+
+  "pagesPermissionStatusGranted": "ممنوح",
+  "@pagesPermissionStatusGranted": {
+    "description": "تسمية الحالة عندما يكون الإذن التشغيلي ممنوحاً حالياً."
+  },
+
+  "pagesPermissionStatusDenied": "غير ممنوح",
+  "@pagesPermissionStatusDenied": {
+    "description": "تسمية الحالة عندما يكون الإذن مرفوضاً أو لم يُطلب بعد."
+  },
+
+  "pagesPermissionStatusPermanent": "مرفوض نهائياً — افتح الإعدادات",
+  "@pagesPermissionStatusPermanent": {
+    "description": "تسمية الحالة عندما يكون الإذن مرفوضاً بشكل دائم."
+  },
+
+  "pagesPermissionStatusInformational": "مفعَّل دائماً",
+  "@pagesPermissionStatusInformational": {
+    "description": "تسمية الحالة للصفوف الإرشادية التي لا تحتاج إلى منح."
+  },
+
+  "pagesPermissionOpenSettings": "افتح الإعدادات",
+  "@pagesPermissionOpenSettings": {
+    "description": "تسمية زر الاحتياط الذي يفتح صفحة إعدادات التطبيق في النظام."
+  },
+
+  "pagesPermissionSettingsHint": "إذا لم يظهر مربع حوار النظام، افتح إعدادات أندرويد ← التطبيقات ← جسور ← الأذونات.",
+  "@pagesPermissionSettingsHint": {
+    "description": "تلميح يظهر أسفل زر المنح كتعليمات احتياطية."
+  },
+
+  "pagesInstructionsTitle": "التعليمات",
+  "@pagesInstructionsTitle": {
+    "description": "عنوان شاشة التعليمات و AppBar الخاص بها."
+  },
+
+  "pagesHowToUseHeader": "كيفية استخدام التطبيق",
+  "@pagesHowToUseHeader": {
+    "description": "عنوان قسم تعليمات استخدام التطبيق."
+  },
+
+  "pagesHowToUseStep1": "افتح جسور واختر قالب نص أو قالب صورة من أعلى الشاشة الرئيسية.",
+  "@pagesHowToUseStep1": {
+    "description": "الخطوة الأولى من تعليمات الاستخدام."
+  },
+
+  "pagesHowToUseStep2": "اختر لغتك الهدف، ثم اكتب النص أو الصقه (أو اختر صورة) في منطقة الإدخال.",
+  "@pagesHowToUseStep2": {
+    "description": "الخطوة الثانية من تعليمات الاستخدام."
+  },
+
+  "pagesHowToUseStep3": "اضغط على \"ترجم\" لمشاهدة النتيجة في الأسفل. يمكنك نسخها أو مشاركتها أو فتحها في عرض الإخراج الكامل.",
+  "@pagesHowToUseStep3": {
+    "description": "الخطوة الثالثة من تعليمات الاستخدام."
+  },
+
+  "pagesHowToUseStep4": "للترجمة من تطبيق آخر، استخدم قائمة المشاركة في النظام واختر جسور — النصوص والروابط والصور مدعومة.",
+  "@pagesHowToUseStep4": {
+    "description": "الخطوة الرابعة من تعليمات الاستخدام."
+  },
+
+  "pagesHowToUseStep5": "للحصول على مترجم عائم فوق أي تطبيق، أضف بلاطة \"ترجم\" من الإعدادات السريعة واضغط عليها لفتح النافذة العائمة.",
+  "@pagesHowToUseStep5": {
+    "description": "الخطوة الخامسة من تعليمات الاستخدام."
+  },
+
+  "pagesHowToWritePromptsHeader": "كيف تكتب مطالبات (prompts) جيدة",
+  "@pagesHowToWritePromptsHeader": {
+    "description": "عنوان قسم نصائح كتابة المطالبات."
+  },
+
+  "pagesHowToWritePromptsTip1": "حدّد النبرة والأسلوب المطلوبين (رسمي، عامّي، تقني، تسويقي...) ليلائم النموذج جمهورك المستهدف.",
+  "@pagesHowToWritePromptsTip1": {
+    "description": "النصيحة الأولى لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "pagesHowToWritePromptsTip2": "اذكر المجال (طبي، قانوني، برمجي، ألعاب...) ليستخدم النموذج المفردات والاصطلاحات المناسبة.",
+  "@pagesHowToWritePromptsTip2": {
+    "description": "النصيحة الثانية لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "pagesHowToWritePromptsTip3": "اذكر أي مصطلحات أو أسماء علامات تجارية أو أسماء منتجات يجب أن تظل بدون ترجمة.",
+  "@pagesHowToWritePromptsTip3": {
+    "description": "النصيحة الثالثة لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "pagesHowToWritePromptsTip4": "وضّح للنموذج كيف يتعامل مع الغموض: يفضّل الترجمة الحرفية، أم الطبيعية، أم يطلب توضيحاً، أم يختار المعنى الأكثر شيوعاً.",
+  "@pagesHowToWritePromptsTip4": {
+    "description": "النصيحة الرابعة لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "pagesHowToWritePromptsTip5": "حدّد صيغة المخرجات التي تريدها: نصّ عادي، أو ماركداون، أو JSON، أو سطراً بسطر مع الحفاظ على بنية المصدر.",
+  "@pagesHowToWritePromptsTip5": {
+    "description": "النصيحة الخامسة لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "pagesHowToWritePromptsTip6": "أرفق أمثلة قصيرة على الأسلوب المطلوب — مثالان قبل/بعد غالباً ما يكونان أبلغ من قائمة قواعد طويلة.",
+  "@pagesHowToWritePromptsTip6": {
+    "description": "النصيحة السادسة لكتابة مطالبات ترجمة جيدة."
+  },
+
+  "tplEditNewTitle": "قالب جديد",
+  "@tplEditNewTitle": {
+    "description": "عنوان شريط محرر القوالب عند إنشاء قالب جديد."
+  },
+
+  "tplEditExistingTitle": "تعديل القالب",
+  "@tplEditExistingTitle": {
+    "description": "عنوان شريط محرر القوالب عند تعديل قالب موجود."
+  },
+
+  "tplEditNameLabel": "الاسم",
+  "@tplEditNameLabel": {
+    "description": "تسمية حقل اسم القالب."
+  },
+
+  "tplEditNameHint": "مثال: مترجم محترف",
+  "@tplEditNameHint": {
+    "description": "نص تلميح حقل اسم القالب."
+  },
+
+  "tplEditProfileLabel": "ملف الموفّر",
+  "@tplEditProfileLabel": {
+    "description": "تسمية قائمة ملف الموفّر في محرر القوالب."
+  },
+
+  "tplEditSystemPromptLabel": "مطالبة النظام",
+  "@tplEditSystemPromptLabel": {
+    "description": "تسمية حقل مطالبة النظام."
+  },
+
+  "tplEditWarningMissingTarget": "لا تحتوي مطالبة النظام على المتغير {target_language}، وقد لا تعرف الترجمة أي لغة تستخدم.",
+  "@tplEditWarningMissingTarget": {
+    "description": "شريط تحذير يظهر عندما تفتقد المطالبة إلى متغير اللغة الهدف.",
+    "placeholders": {
+      "target_language": {
+        "type": "String",
+        "example": "{{target_language}}"
+      }
+    }
+  },
+
+  "tplEditResetToDefault": "استعادة الافتراضي",
+  "@tplEditResetToDefault": {
+    "description": "تسمية زر استعادة مطالبة النظام الافتراضية."
+  },
+
+  "tplEditSupportsText": "يدعم النصوص",
+  "@tplEditSupportsText": {
+    "description": "عنوان مفتاح تمكين ترجمة النصوص للقالب."
+  },
+
+  "tplEditSupportsTextSubtitle": "يمكن استخدام هذا القالب لترجمة النصوص.",
+  "@tplEditSupportsTextSubtitle": {
+    "description": "وصف مفتاح يدعم النصوص."
+  },
+
+  "tplEditSupportsImage": "يدعم الصور",
+  "@tplEditSupportsImage": {
+    "description": "عنوان مفتاح تمكين ترجمة الصور للقالب."
+  },
+
+  "tplEditSupportsImageSubtitle": "يمكن استخدام هذا القالب لترجمة الصور (الترجمة البصرية).",
+  "@tplEditSupportsImageSubtitle": {
+    "description": "وصف مفتاح يدعم الصور."
+  },
+
+  "tplSubTitle": "الاستبدال التلقائي للغة الهدف",
+  "@tplSubTitle": {
+    "description": "عنوان مفتاح التحكم في الاستبدال التلقائي للغة الهدف داخل المطالبة."
+  },
+
+  "tplSubSubtitle": "استبدال المتغير {target_language} في المطالبة باللغة المختارة قبل الإرسال.",
+  "@tplSubSubtitle": {
+    "description": "وصف مفتاح استبدال اللغة الهدف.",
+    "placeholders": {
+      "target_language": {
+        "type": "String",
+        "example": "{{target_language}}"
+      }
+    }
+  },
+
+  "tplEditSaveButton": "حفظ",
+  "@tplEditSaveButton": {
+    "description": "تسمية زر الحفظ العائم في محرر القوالب."
+  },
+
+  "tplEditErrorNameRequired": "اسم القالب مطلوب.",
+  "@tplEditErrorNameRequired": {
+    "description": "رسالة خطأ عند حفظ قالب بدون اسم."
+  },
+
+  "tplEditErrorProfileRequired": "يرجى اختيار ملف موفّر.",
+  "@tplEditErrorProfileRequired": {
+    "description": "رسالة خطأ عند حفظ قالب بدون ملف موفّر."
+  },
+
+  "tplEditErrorPromptRequired": "مطالبة النظام مطلوبة.",
+  "@tplEditErrorPromptRequired": {
+    "description": "رسالة خطأ عند حفظ قالب بدون مطالبة نظام."
+  },
+
+  "tplEditErrorCapabilityRequired": "فعّل إمكانية واحدة على الأقل (نص أو صورة).",
+  "@tplEditErrorCapabilityRequired": {
+    "description": "رسالة خطأ عند حفظ قالب مع تعطيل كلتا الإمكانيتين."
+  },
+
+  "settingsThemeMode": "وضع المظهر",
+  "@settingsThemeMode": {
+    "description": "تسمية محدد وضع المظهر (حسب النظام / نهاري / ليلي) في الإعدادات."
+  },
+
+  "themeSystem": "حسب النظام",
+  "@themeSystem": {
+    "description": "خيار المظهر الذي يتبع إعدادات سطوع جهاز النظام."
+  },
+
+  "themeLight": "نهاري",
+  "@themeLight": {
+    "description": "خيار المظهر الذي يفرض المظهر الفاتح بصرف النظر عن إعداد النظام."
+  },
+
+  "themeDark": "ليلي",
+  "@themeDark": {
+    "description": "خيار المظهر الذي يفرض المظهر الداكن بصرف النظر عن إعداد النظام."
+  },
+
+  "updateAvailableTitle": "إصدار جديد متاح",
+  "@updateAvailableTitle": {
+    "description": "عنوان اللافتة المعروضة أعلى شاشة الإعدادات عند توفر إصدار أحدث على GitHub."
+  },
+
+  "updateAvailableAction": "تنزيل",
+  "@updateAvailableAction": {
+    "description": "زر اللافتة الذي يفتح صفحة الإصدار في المتصفح."
+  },
+
+  "updateAvailableSubtitle": "الإصدار {version} متاح.",
+  "@updateAvailableSubtitle": {
+    "description": "نص لافتة التحديث، يذكر رقم الإصدار الأحدث.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "0.1.6"
+      }
+    }
+  }
+}

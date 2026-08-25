@@ -1,0 +1,20 @@
+name: translate_app
+
+packages:
+  - path: packages/translation_core
+  - path: packages/file_handler
+  - path: packages/history
+  - path: packages/markdown_renderer
+  - path: translation_app
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Run static analysis on all packages
+  test:
+    run: melos exec -- flutter test
+    description: Run tests on all packages

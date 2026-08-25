@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  Legacy Auto Backup rules (Android 11 and below, fullBackupContent).
+
+  Mirrors data_extraction_rules.xml:
+  - database/: sqflite history DB (+ wal/shm/journal) — plaintext translations.
+  - FlutterSharedPreferences.xml: provider profiles, prompt templates.
+  - FlutterSecureStorage.xml: encrypted API-key material.
+-->
+<full-backup-content>
+    <exclude domain="database" />
+    <exclude domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+</full-backup-content>

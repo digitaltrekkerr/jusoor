@@ -1,0 +1,99 @@
+name: Release
+
+"on":
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - run: dart pub global activate melos ^7.0.0
+
+      - run: melos bootstrap
+
+      - name: Decode signing material
+        env:
+          JUSOOR_RELEASE_JKS_BASE64: ${{ secrets.JUSOOR_RELEASE_JKS_BASE64 }}
+          JUSOOR_KEY_PROPERTIES: ${{ secrets.JUSOOR_KEY_PROPERTIES }}
+        run: |
+          if [ -z "${JUSOOR_RELEASE_JKS_BASE64:-}" ] || [ -z "${JUSOOR_KEY_PROPERTIES:-}" ]; then
+            echo "::error::Missing one of the required secrets on the 'release' environment."
+            exit 1
+          fi
+          printf '%s' "$JUSOOR_RELEASE_JKS_BASE64" | base64 -d > "$HOME/jusoor-release-key.jks"
+          # Replace any local storeFile path in key.properties with the
+          # runner-side decoded location: local machines keep the JKS under
+          # their own $HOME; the CI runner uses /home/runner — same JKS,
+          # different $HOME.
+          printf '%s' "$JUSOOR_KEY_PROPERTIES" \
+            | sed -E "s|^storeFile=.*|storeFile=$HOME/jusoor-release-key.jks|" \
+            > translation_app/android/key.properties
+          ls -la "$HOME/jusoor-release-key.jks"
+
+      - name: Build signed release APK
+        working-directory: translation_app
+        run: |
+          LOG="$RUNNER_TEMP/release-build.log"
+          flutter build apk --release 2>&1 | tee "$LOG"
+
+      - name: Fail-closed guard (reject debug-signed APKs)
+        if: always()
+        run: |
+          LOG="$RUNNER_TEMP/release-build.log"
+          if [ ! -f "$LOG" ]; then
+            echo "::error::Build log not found at $LOG"
+            exit 1
+          fi
+          if grep -q "DEBUG keystore" "$LOG" || \
+             grep -q "falling back to DEBUG signing config" "$LOG"; then
+            echo "::error::Release APK was signed with the DEBUG keystore. Refusing to publish."
+            exit 1
+          fi
+
+      - name: Rename APK to jusoor.apk
+        run: |
+          SRC="translation_app/build/app/outputs/flutter-apk/app-release.apk"
+          DST="jusoor.apk"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::Expected APK not found at $SRC"
+            exit 1
+          fi
+          mv "$SRC" "$DST"
+          ls -la "$DST"
+
+      - name: Publish public GitHub Release 'jusoor' with jusoor.apk
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.sha }}
+          name: jusoor
+          body: ${{ github.event.head_commit.message }}
+          files: jusoor.apk
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          draft: false
+          prerelease: false

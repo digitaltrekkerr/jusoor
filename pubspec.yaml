@@ -1,0 +1,28 @@
+name: translate_app
+publish_to: none
+environment:
+  sdk: "^3.10.8"
+
+dev_dependencies:
+  melos: ^7.0.0
+
+workspace:
+  - packages/translation_core
+  - packages/file_handler
+  - packages/history
+  - packages/markdown_renderer
+  - translation_app
+
+melos:
+  packages:
+    - packages/**
+  command:
+    bootstrap:
+      usePubspecOverrides: true
+  scripts:
+    analyze:
+      run: melos exec -- flutter analyze
+      description: Run static analysis on all packages
+    test:
+      run: melos exec -- flutter test
+      description: Run tests on all packages

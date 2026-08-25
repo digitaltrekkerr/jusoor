@@ -1,0 +1,17 @@
+name: file_handler
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: "^3.10.8"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  file_picker: ^11.0.0
+  html: ^0.15.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
