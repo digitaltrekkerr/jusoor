@@ -20,8 +20,6 @@ your choice.
 | Home | Settings |
 |---|---|
 | ![Home](docs/screenshots/home.png) | ![Settings](docs/screenshots/settings.png) |
-| **Permissions** | **Instructions** |
-| ![Permissions](docs/screenshots/permissions.png) | ![Instructions](docs/screenshots/instructions.png) |
 | **Overlay (empty)** | **Overlay (translated)** |
 | ![Overlay empty](docs/screenshots/overlay-empty.png) | ![Overlay translated](docs/screenshots/overlay-translated.png) |
 
@@ -32,7 +30,7 @@ on top of any app, and translates text in place — no copying, no switching
 apps:
 
 <p align="center">
-  <video src="docs/quick-tile-demo.mp4" width="320" controls></video>
+  <img src="docs/quick-tile-demo-small.gif" alt="Quick Settings tile → floating overlay → translate in place" width="280">
 </p>
 <p align="center"><em>The overlay summoned from the Quick Settings tile — translate anything, anywhere.</em></p>
 
