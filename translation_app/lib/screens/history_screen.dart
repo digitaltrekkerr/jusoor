@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:history/history.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/history_provider.dart';
 import '../widgets/bidi_markdown_view.dart';
 import 'history_detail_screen.dart';
@@ -105,14 +106,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // ── Date formatting ─────────────────────────────────────────────────
 
   /// Formats a Unix-millisecond timestamp into a human-readable label.
-  static String _formatDate(int timestamp) {
+  static String _formatDate(AppLocalizations l10n, int timestamp) {
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final now = DateTime.now();
     final diff = now.difference(date);
 
-    if (diff.inDays == 0) return 'Today';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    if (diff.inDays == 0) return l10n.historyToday;
+    if (diff.inDays == 1) return l10n.historyYesterday;
+    if (diff.inDays < 7) return l10n.historyDaysAgo(diff.inDays);
     return '${date.day}/${date.month}/${date.year}';
   }
 
@@ -152,12 +153,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     if (!mounted) return;
 
+    final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Translation deleted'),
+        content: Text(l10n.historyDeletedSnackbar),
         action: SnackBarAction(
-          label: 'UNDO',
+          label: l10n.historyUndoAction,
           onPressed: () async {
             final service = ref.read(historyServiceProvider);
             await service.insertWithId(savedRecord);
@@ -175,25 +177,23 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   /// Shows a confirmation dialog and, if confirmed, deletes all history.
   Future<void> _handleClearAll() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear All History'),
-        content: const Text(
-          'This will permanently delete all translation history. '
-          'This action cannot be undone.',
-        ),
+        title: Text(l10n.historyClearAllTitle),
+        content: Text(l10n.historyClearAllBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.appCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Clear All'),
+            child: Text(l10n.historyClearAllButton),
           ),
         ],
       ),
@@ -231,14 +231,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget build(BuildContext context) {
     final asyncRecords = ref.watch(historyListProvider);
     final isSearchMode = _searchQuery.isNotEmpty;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('History'),
+        title: Text(l10n.navHistory),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Clear all history',
+            tooltip: l10n.historyClearAllTooltip,
             // Disable while searching — the user should clear the search
             // first to see the full list before bulk-deleting.
             onPressed: isSearchMode ? null : _handleClearAll,
@@ -252,7 +253,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: SearchBar(
               controller: _searchController,
-              hintText: 'Search translations...',
+              hintText: l10n.historySearchHint,
               leading: const Icon(Icons.search),
               trailing: [
                 if (_searchQuery.isNotEmpty)
@@ -285,7 +286,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_searchResults.isEmpty) {
-      return _EmptyState(isSearching: true, searchQuery: _searchQuery);
+      return _EmptyState(
+        isSearching: true,
+        searchQuery: _searchQuery,
+        onRefresh: () => _performSearch(_searchQuery),
+      );
     }
     return _buildRecordList(records: _searchResults, onRefresh: _performSearch);
   }
@@ -299,7 +304,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       error: (error, _) => _ErrorState(error: error, onRetry: _handleRefresh),
       data: (records) {
         if (records.isEmpty) {
-          return const _EmptyState(isSearching: false, searchQuery: '');
+          return _EmptyState(
+            isSearching: false,
+            searchQuery: '',
+            onRefresh: _handleRefresh,
+          );
         }
         return _buildRecordList(
           records: records,
@@ -326,7 +335,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             // Record IDs are always set when loaded from the database.
             key: ValueKey(record.id),
             record: record,
-            formatDate: _formatDate,
+            formatDate: (ts) => _formatDate(
+              AppLocalizations.of(context),
+              ts,
+            ),
             inputTypeIcon: _inputTypeIcon,
             onTap: () => _navigateToDetail(record),
             onDismissed: () => _handleDelete(record),
@@ -340,36 +352,42 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 // ── Empty state widget ─────────────────────────────────────────────────
 
 /// Shown when the history list or search results are empty.
+///
+/// Wrapped in a [RefreshIndicator] over a full-height always-scrollable view
+/// so pull-to-refresh keeps working even when there is no data to scroll.
 class _EmptyState extends StatelessWidget {
   final bool isSearching;
   final String searchQuery;
+  final Future<void> Function() onRefresh;
 
   /// Creates the empty state.
-  const _EmptyState({required this.isSearching, required this.searchQuery});
+  const _EmptyState({
+    required this.isSearching,
+    required this.searchQuery,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
+    final Widget content;
     if (isSearching) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            // Isolate the query with LRI…PDI so Arabic/mixed queries keep
-            // their internal order instead of scrambling around the quotes.
-            "No results for '\u2066$searchQuery\u2069'",
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
+      content = Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          // Isolate the query with LRI…PDI so Arabic/mixed queries keep
+          // their internal order instead of scrambling around the quotes.
+          l10n.historyNoResults('\u2066$searchQuery\u2069'),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
+          textAlign: TextAlign.center,
         ),
       );
-    }
-
-    return Center(
-      child: Column(
+    } else {
+      content = Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -379,12 +397,27 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'No translation history yet',
+            l10n.historyEmptyState,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      // A bare Center cannot trigger the RefreshIndicator; stretch the
+      // content to the viewport height inside an always-scrollable view.
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(child: content),
+          ),
+        ),
       ),
     );
   }
@@ -403,6 +436,7 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Center(
       child: Column(
@@ -410,7 +444,7 @@ class _ErrorState extends StatelessWidget {
         children: [
           Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
           const SizedBox(height: 16),
-          Text('Failed to load history', style: theme.textTheme.titleMedium),
+          Text(l10n.historyLoadFailed, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
             error.toString(),
@@ -420,7 +454,10 @@ class _ErrorState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+          FilledButton.tonal(
+            onPressed: onRetry,
+            child: Text(l10n.articleRetry),
+          ),
         ],
       ),
     );
@@ -510,7 +547,10 @@ class _HistoryListItem extends StatelessWidget {
                         if (record.wordCount != null) ...[
                           const SizedBox(width: 8),
                           Text(
-                            '${record.wordCount} words',
+                            // wordCount is null-checked by the enclosing if.
+                            AppLocalizations.of(
+                              context,
+                            ).homeWordCount(record.wordCount!),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

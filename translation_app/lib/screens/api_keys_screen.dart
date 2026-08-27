@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
 import '../services/settings_repository.dart';
 
@@ -15,14 +16,15 @@ class ApiKeysScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final apiKeys = ref.watch(apiKeysProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API Keys'),
+        title: Text(l10n.apiKeysTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Add API Key',
+            tooltip: l10n.apiKeysAddTooltip,
             onPressed: () => _showEditDialog(context, ref, null),
           ),
         ],
@@ -30,16 +32,30 @@ class ApiKeysScreen extends ConsumerWidget {
       body: apiKeys.isEmpty
           ? Center(
               child: Text(
-                'No API keys yet. Tap + to add one.',
+                l10n.apiKeysEmptyState,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: apiKeys.length,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: apiKeys.length + 1,
               itemBuilder: (context, index) {
+                if (index == apiKeys.length) {
+                  // Trailing CTA so users can add a new key without
+                  // reaching for the AppBar "+" icon. Matches the
+                  // discoverability guidance added with the
+                  // profile-edit access dialog.
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showEditDialog(context, ref, null),
+                      icon: const Icon(Icons.add),
+                      label: Text(l10n.apiKeysAddNewButton),
+                    ),
+                  );
+                }
                 final entry = apiKeys[index];
                 return _ApiKeyCard(
                   entry: entry,
@@ -71,12 +87,15 @@ class ApiKeysScreen extends ConsumerWidget {
     }
 
     final formKey = GlobalKey<FormState>();
+    final l10n = AppLocalizations.of(context);
 
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(isEditing ? 'Edit API Key' : 'Add API Key'),
+          title: Text(
+            isEditing ? l10n.apiKeysEditTitle : l10n.apiKeysAddTitle,
+          ),
           content: Form(
             key: formKey,
             child: Column(
@@ -84,14 +103,14 @@ class ApiKeysScreen extends ConsumerWidget {
               children: [
                 TextFormField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    hintText: 'e.g. OpenRouter, Gemini',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.commonName,
+                    hintText: l10n.apiKeysNameHint,
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Name is required';
+                      return l10n.apiKeysNameRequired;
                     }
                     return null;
                   },
@@ -101,7 +120,7 @@ class ApiKeysScreen extends ConsumerWidget {
                   controller: valueController,
                   obscureText: obscureValue,
                   decoration: InputDecoration(
-                    labelText: 'API Key Value',
+                    labelText: l10n.apiKeysValueLabel,
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -114,7 +133,7 @@ class ApiKeysScreen extends ConsumerWidget {
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'API key value is required';
+                      return l10n.apiKeysValueRequired;
                     }
                     return null;
                   },
@@ -125,7 +144,7 @@ class ApiKeysScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text(l10n.appCancel),
             ),
             FilledButton(
               onPressed: () {
@@ -133,7 +152,7 @@ class ApiKeysScreen extends ConsumerWidget {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Save'),
+              child: Text(l10n.commonSave),
             ),
           ],
         ),
@@ -156,7 +175,7 @@ class ApiKeysScreen extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save API key: $e'),
+            content: Text(l10n.apiKeysSaveFailed('$e')),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -170,26 +189,23 @@ class ApiKeysScreen extends ConsumerWidget {
     WidgetRef ref,
     ApiKeyEntry entry,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete API Key?'),
-        content: Text(
-          'Are you sure you want to delete "${entry.name}"? '
-          'This cannot be undone.\n\n'
-          'Profiles using this key will have their API key reference removed.',
-        ),
+        title: Text(l10n.apiKeysDeleteTitle),
+        content: Text(l10n.apiKeysDeleteBody(entry.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.appCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -228,7 +244,7 @@ class _ApiKeyCard extends ConsumerWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit_outlined, size: 20),
-              tooltip: 'Edit',
+              tooltip: AppLocalizations.of(context).commonEdit,
               onPressed: onEdit,
             ),
             IconButton(
@@ -237,7 +253,7 @@ class _ApiKeyCard extends ConsumerWidget {
                 size: 20,
                 color: theme.colorScheme.error,
               ),
-              tooltip: 'Delete',
+              tooltip: AppLocalizations.of(context).commonDelete,
               onPressed: onDelete,
             ),
           ],
@@ -273,7 +289,9 @@ class _ObscuredKeyValueState extends ConsumerState<_ObscuredKeyValue> {
         .getApiKeyValue(widget.entryId);
     if (!mounted) return;
     if (value == null || value.isEmpty) {
-      setState(() => _display = '(empty)');
+      setState(
+        () => _display = AppLocalizations.of(context).apiKeysEmptyValue,
+      );
       return;
     }
     if (value.length <= 7) {

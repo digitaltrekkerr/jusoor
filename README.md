@@ -25,6 +25,17 @@ your choice.
 | **Overlay (empty)** | **Overlay (translated)** |
 | ![Overlay empty](docs/screenshots/overlay-empty.png) | ![Overlay translated](docs/screenshots/overlay-translated.png) |
 
+## Quick tile in action
+
+Watch how the **Quick Settings tile** launches the floating overlay, opens it
+on top of any app, and translates text in place — no copying, no switching
+apps:
+
+<p align="center">
+  <video src="docs/quick-tile-demo.mp4" width="320" controls></video>
+</p>
+<p align="center"><em>The overlay summoned from the Quick Settings tile — translate anything, anywhere.</em></p>
+
 ## What is Jusoor?
 
 Jusoor is built for moments when you are inside another app and hit a language

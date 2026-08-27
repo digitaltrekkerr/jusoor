@@ -25,7 +25,7 @@ class TemplatesScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Add Template',
+            tooltip: l10n.templatesAddTooltip,
             onPressed: () => _navigateToEdit(context, null),
           ),
         ],
@@ -33,7 +33,7 @@ class TemplatesScreen extends ConsumerWidget {
       body: templates.isEmpty
           ? Center(
               child: Text(
-                'No templates yet. Tap + to add one.',
+                l10n.templatesEmptyState,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -107,11 +107,11 @@ class TemplatesScreen extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 12),
           child: ExpansionTile(
             initiallyExpanded: true,
-            title: const Row(
+            title: Row(
               children: [
-                Text('Unknown Profile'),
-                SizedBox(width: 8),
-                Icon(Icons.warning_amber, size: 16, color: Colors.orange),
+                Text(AppLocalizations.of(context).templatesUnknownProfile),
+                const SizedBox(width: 8),
+                const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
               ],
             ),
             children: [
@@ -147,18 +147,16 @@ class TemplatesScreen extends ConsumerWidget {
     WidgetRef ref,
     PromptTemplate template,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Template?'),
+        title: Text(l10n.templatesDeleteTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to delete "${template.name}"? '
-              'This cannot be undone.',
-            ),
+            Text(l10n.templatesDeleteBody(template.name)),
             if (template.isBuiltIn) ...[
               const SizedBox(height: 12),
               Container(
@@ -177,8 +175,7 @@ class TemplatesScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'This is a built-in template. You can restore it by '
-                        'going to Settings and tapping "Restore Built-in Items".',
+                        l10n.templatesBuiltInWarning,
                         style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                           color: Theme.of(ctx).colorScheme.onErrorContainer,
                         ),
@@ -193,14 +190,14 @@ class TemplatesScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.appCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -229,6 +226,7 @@ class _TemplateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return ListTile(
       title: Row(
@@ -236,11 +234,11 @@ class _TemplateTile extends StatelessWidget {
           Flexible(child: Text(template.name)),
           const SizedBox(width: 8),
           if (template.supportsText)
-            _CapabilityBadge(label: 'Text', color: Colors.blue, theme: theme),
+            _CapabilityBadge(label: l10n.badgeText, color: Colors.blue, theme: theme),
           if (template.supportsImage) ...[
             const SizedBox(width: 4),
             _CapabilityBadge(
-              label: 'Image',
+              label: l10n.badgeImage,
               color: Colors.purple,
               theme: theme,
             ),
@@ -257,7 +255,7 @@ class _TemplateTile extends StatelessWidget {
           size: 20,
           color: theme.colorScheme.error,
         ),
-        tooltip: 'Delete',
+        tooltip: l10n.commonDelete,
         onPressed: onDelete,
       ),
       onTap: onTap,
@@ -360,7 +358,7 @@ class _BuiltInBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        'Built-in',
+        AppLocalizations.of(context).badgeBuiltIn,
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.primary,
           fontSize: 10,

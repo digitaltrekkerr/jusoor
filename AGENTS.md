@@ -25,27 +25,26 @@ cd translation_app && flutter build apk --release
 ## Version policy
 
 The single source of truth for the version is `translation_app/pubspec.yaml`,
-field `version: <semver>+<build>` (example: `0.1.5+2005`).
+field `version: <semver>` (example: `0.1.6`).
 
 Rules for maintainers:
 
-1. Every commit that lands on `main` MUST increment the numeric build
-   component (after the `+`) by exactly `1`. The semver prefix is only
-   changed by the maintainer when starting a release cycle (`0.1.6`, `1.0.0`…).
+1. Every commit that lands on `main` MUST increment the patch component of
+   the semver version by exactly `1`. The minor is only changed when
+   starting a release cycle (`0.2.0`, `1.0.0`…).
 2. Always read the current value from `pubspec.yaml` before incrementing —
-   never infer it from git log or CI run numbers. Build numbers are
-   immutable once shipped.
+   never infer it from git log or CI run numbers.
 3. Releases are built automatically by `.github/workflows/release.yml` on
-   push to `main`: a signed APK is published as a GitHub Release named
-   `jusoor` with the asset `jusoor.apk`. The release tag is synthesised
-   from the commit SHA (`build-<sha>`).
+   push to `main` or a tag `v*`. Semver-tag pushes produce a non-prerelease
+   GitHub Release (the update checker reads this); main-push builds create
+   prerelease entries tagged `build-<sha>`.
 
 Quick bump helper:
 
 ```bash
 v=$(grep '^version:' translation_app/pubspec.yaml | awk -F: '{print $2}' | tr -d ' ')
-name=${v%+*}; build=${v##*+}
-sed -i -E "s|^version:.*|version: ${name}+$((build + 1))|" translation_app/pubspec.yaml
+major=${v%%.*}; rest=${v#*.}; minor=${rest%%.*}; patch=${rest#*.}
+sed -i -E "s|^version:.*|version: ${major}.${minor}.$((patch + 1))|" translation_app/pubspec.yaml
 ```
 
 ## Contributing

@@ -319,4 +319,121 @@ void main() {
       expect(map['api_key'], '');
     });
   });
+
+  group('safety net — no auto sentinel reaches the prompt', () {
+    const template = 'Translate to {{target_language}}.';
+
+    test('real language (Arabic) substitutes with substituteTargetLanguage: true', () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'العربية',
+        substituteTargetLanguage: true,
+      );
+      final result = VariableSubstitutor.substitute(template, request);
+      expect(result, 'Translate to العربية.');
+      expect(result, isNot(contains('{{target_language}}')));
+    });
+
+    test('real language (French) substitutes inside a nested system_prompt', () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'French',
+        systemPrompt: 'Translate to {{target_language}}.',
+        substituteTargetLanguage: true,
+      );
+      final result = VariableSubstitutor.substitute(
+        '{{system_prompt}}',
+        request,
+      );
+      expect(result, 'Translate to French.');
+    });
+
+    test("'auto' falls back to Arabic and never reaches the prompt", () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'auto',
+      );
+      final result = VariableSubstitutor.substitute(template, request);
+      expect(result, 'Translate to Arabic.');
+      expect(result.toLowerCase(), isNot(contains('auto')));
+      expect(result, isNot(contains('{{target_language}}')));
+    });
+
+    test("'AUTO' (case-insensitive) falls back to Arabic", () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'AUTO',
+      );
+      final result = VariableSubstitutor.substitute(template, request);
+      expect(result, 'Translate to Arabic.');
+    });
+
+    test("'تلقائي' (Arabic sentinel) falls back to Arabic", () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'تلقائي',
+      );
+      final result = VariableSubstitutor.substitute(template, request);
+      expect(result, 'Translate to Arabic.');
+      expect(result, isNot(contains('تلقائي')));
+      expect(result, isNot(contains('{{target_language}}')));
+    });
+
+    test("whitespace-padded ' auto ' falls back to Arabic", () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: ' auto ',
+      );
+      final result = VariableSubstitutor.substitute(template, request);
+      expect(result, 'Translate to Arabic.');
+    });
+
+    test('empty value from a caller-supplied map falls back to Arabic', () {
+      // The TranslationRequest constructor asserts non-empty targetLanguage,
+      // so the empty case is exercised through the caller-supplied map path
+      // (e.g. overlay IPC callers that build maps directly).
+      const variables = <String, String>{'target_language': ''};
+      final result = VariableSubstitutor.substituteMap(template, variables);
+      expect(result, 'Translate to Arabic.');
+    });
+
+    test('caller-supplied map with auto is sanitized at substitution time', () {
+      const variables = <String, String>{'target_language': 'Auto'};
+      final result = VariableSubstitutor.substituteMap(template, variables);
+      expect(result, 'Translate to Arabic.');
+      expect(result.toLowerCase(), isNot(contains('auto')));
+    });
+
+    test('buildVariableMap sanitizes the auto sentinel', () {
+      const request = TranslationRequest(
+        inputText: 'Hello',
+        targetLanguage: 'auto',
+      );
+      final map = VariableSubstitutor.buildVariableMap(request, 'key');
+      expect(map['target_language'], 'Arabic');
+    });
+
+    test('buildRawVariableMap sanitizes the Arabic sentinel', () {
+      const request = TranslationRequest(
+        inputText: 'Hello',
+        targetLanguage: 'تلقائي',
+      );
+      final map = VariableSubstitutor.buildRawVariableMap(request);
+      expect(map['target_language'], 'Arabic');
+    });
+
+    test('happy path: non-fixed template still substitutes the chosen language', () {
+      const request = TranslationRequest(
+        inputText: 'Hello world',
+        targetLanguage: 'German',
+        systemPrompt: 'You are a translator. Output in {{target_language}}.',
+        substituteTargetLanguage: true,
+      );
+      final result = VariableSubstitutor.substitute(
+        '{{system_prompt}}',
+        request,
+      );
+      expect(result, 'You are a translator. Output in German.');
+    });
+  });
 }

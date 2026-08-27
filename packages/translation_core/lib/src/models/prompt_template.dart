@@ -1,42 +1,61 @@
+// Copyright (c) 2026 Jusoor. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file in the root of the source tree.
+
 import 'package:equatable/equatable.dart';
 
-/// A reusable prompt template tied to a [ProviderProfile].
+/// A named prompt template that pairs a [ProviderProfile] with a
+/// system prompt and capability flags.
 ///
-/// Templates define the system prompt and capabilities (text and/or image
-/// translation). Built-in templates are read-only and cannot be deleted.
+/// Templates are the user-editable unit behind the home screen's
+/// text/image template selector and the translation overlay. They are
+/// persisted to disk via [toJson]/[fromJson] and round-tripped through
+/// shared preferences (no schema migration is performed — unknown
+/// fields on read are simply ignored).
 class PromptTemplate extends Equatable {
-  /// Unique identifier (UUID).
+  /// Stable identifier; the SQLite primary key for user templates and a
+  /// fixed constant for built-in templates.
   final String id;
 
-  /// ID of the [ProviderProfile] this template belongs to.
+  /// Identifier of the [ProviderProfile] used to translate this template.
   final String profileId;
 
-  /// Display name, e.g. "Professional Translator", "Image Translator".
+  /// Human-readable name shown in the template selector and editor.
   final String name;
 
-  /// System prompt text with `{{target_language}}` and other placeholders.
+  /// System prompt body. May contain `{{target_language}}` and
+  /// `{{source_language}}` placeholders that the substitution layer
+  /// fills before the request is sent.
   final String systemPrompt;
 
-  /// Whether this template can be used for text translation.
+  /// Whether this template is offered for text input. Templates that
+  /// only handle images leave this `false` to hide them in the text
+  /// selector.
   final bool supportsText;
 
-  /// Whether this template can be used for image/vision translation.
+  /// Whether this template accepts an image (multimodal) input.
   final bool supportsImage;
 
-  /// Whether this is a pre-built template (not editable, not deletable).
+  /// Marks a template shipped with the app. Built-in templates cannot
+  /// be deleted and are restored to their shipped prompt on reset.
   final bool isBuiltIn;
 
-  /// Whether `{{target_language}}` in [systemPrompt] is replaced with the
-  /// actual language name before being sent to the LLM.
-  ///
-  /// When `true` (the default), the placeholder is substituted with the
-  /// chosen target language (e.g. `{{target_language}}` → `"Arabic"`).
-  /// When `false`, the literal placeholder `{{target_language}}` is left
-  /// in the prompt so the LLM sees it verbatim — useful for models or
-  /// provider pipelines that handle language selection themselves.
-  ///
-  /// Defaults to `true` for backward compatibility.
+  /// When `true` (the default), the substitution layer replaces
+  /// `{{target_language}}` in [systemPrompt] with the user-selected
+  /// target language before sending. When `false`, the placeholder is
+  /// preserved verbatim in the prompt — useful for profiles whose
+  /// provider pipeline handles language selection itself.
   final bool substituteTargetLanguage;
+
+  /// When `true`, this template does not depend on a `{{target_language}}`
+  /// variable — its output language is fixed inside the template body.
+  ///
+  /// The home screen hides the target-language selector when this template
+  /// is active, and the overlay translation feature refuses to use it
+  /// (the overlay always needs a user-chosen target language).
+  ///
+  /// Defaults to `false` for backward compatibility.
+  final bool outputLanguageFixed;
 
   /// Creates a [PromptTemplate].
   const PromptTemplate({
@@ -48,6 +67,7 @@ class PromptTemplate extends Equatable {
     required this.supportsImage,
     this.isBuiltIn = false,
     this.substituteTargetLanguage = true,
+    this.outputLanguageFixed = false,
   });
 
   /// Creates a [PromptTemplate] from a JSON map.
@@ -65,6 +85,7 @@ class PromptTemplate extends Equatable {
       isBuiltIn: json['isBuiltIn'] as bool? ?? false,
       substituteTargetLanguage:
           json['substituteTargetLanguage'] as bool? ?? true,
+      outputLanguageFixed: json['outputLanguageFixed'] as bool? ?? false,
     );
   }
 
@@ -79,6 +100,7 @@ class PromptTemplate extends Equatable {
       'supportsImage': supportsImage,
       'isBuiltIn': isBuiltIn,
       'substituteTargetLanguage': substituteTargetLanguage,
+      'outputLanguageFixed': outputLanguageFixed,
     };
   }
 
@@ -92,6 +114,7 @@ class PromptTemplate extends Equatable {
     bool? supportsImage,
     bool? isBuiltIn,
     bool? substituteTargetLanguage,
+    bool? outputLanguageFixed,
   }) {
     return PromptTemplate(
       id: id ?? this.id,
@@ -103,6 +126,7 @@ class PromptTemplate extends Equatable {
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
       substituteTargetLanguage:
           substituteTargetLanguage ?? this.substituteTargetLanguage,
+      outputLanguageFixed: outputLanguageFixed ?? this.outputLanguageFixed,
     );
   }
 
@@ -116,5 +140,6 @@ class PromptTemplate extends Equatable {
     supportsImage,
     isBuiltIn,
     substituteTargetLanguage,
+    outputLanguageFixed,
   ];
 }

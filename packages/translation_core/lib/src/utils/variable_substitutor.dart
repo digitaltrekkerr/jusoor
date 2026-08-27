@@ -33,6 +33,14 @@ import '../models/translation_request.dart';
 /// the inner `{{target_language}}` is resolved on the next pass.
 ///
 /// A maximum of 5 passes prevents infinite loops from circular references.
+///
+/// ### `{{target_language}}` safety net
+///
+/// A literal `'auto'` / `'تلقائي'` (case-insensitive) or an empty value can
+/// never be substituted for `{{target_language}}` — any such value falls
+/// back to [_fallbackTargetLanguage] (`'Arabic'`).
+/// Without this guard a prompt such as "translate to auto" makes the model
+/// return the source text unchanged.
 class VariableSubstitutor {
   VariableSubstitutor._();
 
@@ -42,6 +50,13 @@ class VariableSubstitutor {
   /// Maximum number of substitution passes to prevent infinite loops
   /// caused by circular placeholder references.
   static const int _maxPasses = 5;
+
+  /// Fallback value substituted for `{{target_language}}` when a caller
+  /// supplies the `'auto'` sentinel (English or Arabic, case-insensitive)
+  /// or an empty string. Matches the app-level persisted default target
+  /// language (the translation_app settings repository defaults to
+  /// `'Arabic'`).
+  static const String _fallbackTargetLanguage = 'Arabic';
 
   /// Substitutes all `{{variable}}` placeholders in [template] using values
   /// from [request].
@@ -124,12 +139,33 @@ class VariableSubstitutor {
           // Preserve the original `{{name}}` token literally.
           return match.group(0)!;
         }
+        if (key == 'target_language') {
+          // Safety net applied at the substitution choke point as well as in
+          // the variable maps: never let the 'auto' sentinel (English or
+          // Arabic, case-insensitive) or an empty value reach the prompt —
+          // "translate to auto" makes the model echo the source unchanged.
+          return _safeTargetLanguage(variables[key] ?? '');
+        }
         return variables[key] ?? '';
       });
       if (next == result) break; // No more placeholders resolved.
       result = next;
     }
     return result;
+  }
+
+  /// Returns a safe value for the `{{target_language}}` placeholder.
+  ///
+  /// Safety net: a literal `'auto'` or `'تلقائي'` (case-insensitive, after
+  /// trimming) or an empty value must never be emitted into a prompt.
+  /// Callers that have not resolved a concrete language fall back to
+  /// [_fallbackTargetLanguage] instead of the sentinel.
+  static String _safeTargetLanguage(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return _fallbackTargetLanguage;
+    final lower = trimmed.toLowerCase();
+    if (lower == 'auto' || lower == 'تلقائي') return _fallbackTargetLanguage;
+    return value;
   }
 
   /// Escapes a string value for safe embedding inside a JSON string literal.
@@ -189,7 +225,7 @@ class VariableSubstitutor {
     return {
       'system_prompt': jsonEscape(request.systemPrompt),
       'input_text': jsonEscape(request.inputText),
-      'target_language': jsonEscape(request.targetLanguage),
+      'target_language': jsonEscape(_safeTargetLanguage(request.targetLanguage)),
       'image_base64': request.imageBase64 ?? '',
       'image_mime_type': request.imageMimeType ?? 'image/jpeg',
       'api_key':
@@ -213,7 +249,7 @@ class VariableSubstitutor {
     return {
       'system_prompt': jsonEscape(request.systemPrompt),
       'input_text': jsonEscape(request.inputText),
-      'target_language': jsonEscape(request.targetLanguage),
+      'target_language': jsonEscape(_safeTargetLanguage(request.targetLanguage)),
       'image_base64': request.imageBase64 ?? '',
       'image_mime_type': request.imageMimeType ?? 'image/jpeg',
       'api_key': jsonEscape(apiKey),
@@ -237,7 +273,7 @@ class VariableSubstitutor {
     return {
       'system_prompt': request.systemPrompt,
       'input_text': request.inputText,
-      'target_language': request.targetLanguage,
+      'target_language': _safeTargetLanguage(request.targetLanguage),
       'image_base64': request.imageBase64 ?? '',
       'image_mime_type': request.imageMimeType ?? 'image/jpeg',
       'api_key': apiKey ?? '',

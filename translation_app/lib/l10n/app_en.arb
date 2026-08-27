@@ -107,6 +107,11 @@
     "description": "Primary action button label for starting a translation."
   },
 
+  "historyAutoDetected": "Auto-detected",
+  "@historyAutoDetected": {
+    "description": "Chip label indicating the source language was detected automatically, shown in the translation detail header."
+  },
+
   "homeClearButton": "Clear",
   "@homeClearButton": {
     "description": "Clear-input secondary button label."
@@ -181,6 +186,11 @@
   "homeErrorFileBytes": "Could not read file bytes.",
   "@homeErrorFileBytes": {
     "description": "Snackbar message when a picked file has no readable bytes."
+  },
+
+  "shareFileTooLarge": "This file is too large to open (over 50 MB). Pick a smaller file.",
+  "@shareFileTooLarge": {
+    "description": "Snackbar shown when a shared or imported file exceeds the 50 MB ceiling."
   },
 
   "homeFileWillBeChunked": "File will be translated in chunks",
@@ -384,6 +394,31 @@
   "settingsArticlesSubtitle": "Quick guides & how-it-works",
   "@settingsArticlesSubtitle": {
     "description": "Subtitle under the 'Articles' tile in Settings → Help & Support, describing what the page contains."
+  },
+
+  "settingsTips": "Tips",
+  "@settingsTips": {
+    "description": "Title of the Tips page and of the tile that opens it from Settings → Help & Support."
+  },
+
+  "settingsTipsSubtitle": "Quick tips & step-by-step guides",
+  "@settingsTipsSubtitle": {
+    "description": "Subtitle under the 'Tips' tile in Settings → Help & Support."
+  },
+
+  "tipsQuickTipsHeader": "Quick tips",
+  "@tipsQuickTipsHeader": {
+    "description": "Section header at the top of the Tips page listing actionable advice."
+  },
+
+  "tipsUsageHeader": "How to use the app",
+  "@tipsUsageHeader": {
+    "description": "Section header on the Tips page listing how-to-use steps."
+  },
+
+  "tipsSetupHeader": "Step-by-step setup",
+  "@tipsSetupHeader": {
+    "description": "Section header on the Tips page linking to the setup articles."
   },
 
   "articleLoadError": "Could not load the article.",
@@ -748,6 +783,16 @@
     }
   },
 
+  "tplOutLangFixedTitle": "Fixed output language (no variable)",
+  "@tplOutLangFixedTitle": {
+    "description": "Title of the switch that marks a template as having a fixed output language."
+  },
+
+  "tplOutLangFixedSubtitle": "This template works without a target language variable — the language selector will be hidden in the home screen, and it won't be assignable to the overlay.",
+  "@tplOutLangFixedSubtitle": {
+    "description": "Subtitle of the fixed-output-language switch."
+  },
+
   "tplEditSaveButton": "Save",
   "@tplEditSaveButton": {
     "description": "Label of the floating save button in the template editor."
@@ -812,5 +857,509 @@
         "example": "0.1.6"
       }
     }
+  },
+
+  "copyAsPlain": "Copy as plain text",
+  "@copyAsPlain": {
+    "description": "Option in the copy bottom sheet that copies the translation stripped of Markdown formatting."
+  },
+
+  "copyAsMarkdown": "Copy as Markdown",
+  "@copyAsMarkdown": {
+    "description": "Option in the copy bottom sheet that copies the translation as raw Markdown."
+  },
+
+  "shareAsPlain": "Share as plain text",
+  "@shareAsPlain": {
+    "description": "Option in the share bottom sheet that shares the translation stripped of Markdown formatting."
+  },
+
+  "shareAsMarkdown": "Share as Markdown",
+  "@shareAsMarkdown": {
+    "description": "Option in the share bottom sheet that shares the translation as a .md file (current behavior)."
+  },
+
+  "saveToFile": "Save to file",
+  "@saveToFile": {
+    "description": "Option in the share bottom sheet that lets the user save the translation as a file via the system share sheet."
+  },
+
+  "copyOptionsTitle": "Copy options",
+  "@copyOptionsTitle": {
+    "description": "Title of the bottom sheet shown on long-press of the copy button to let the user pick plain vs Markdown."
+  },
+
+  "shareOptionsTitle": "Share options",
+  "@shareOptionsTitle": {
+    "description": "Title of the bottom sheet shown when the share button is tapped, letting the user pick plain, Markdown, or save-to-file."
+  },
+
+  "sheetPlainSubtitle": "Without Markdown formatting",
+  "@sheetPlainSubtitle": {
+    "description": "Subtitle under the copy/share-as-plain-text options in the copy/share bottom sheets."
+  },
+
+  "sheetMarkdownFileSubtitle": "Text file with original formatting",
+  "@sheetMarkdownFileSubtitle": {
+    "description": "Subtitle under the share-as-Markdown-file option in the share bottom sheet."
+  },
+
+  "sheetCopyMarkdownSubtitle": "With original formatting",
+  "@sheetCopyMarkdownSubtitle": {
+    "description": "Subtitle under the copy-as-Markdown option in the copy bottom sheet."
+  },
+
+  "sheetSaveToFileSubtitle": "Pick the destination from the share sheet",
+  "@sheetSaveToFileSubtitle": {
+    "description": "Subtitle under the save-to-file option in the share bottom sheet."
+  },
+
+  "commonName": "Name",
+  "@commonName": {
+    "description": "Generic label for a Name field."
+  },
+
+  "commonDelete": "Delete",
+  "@commonDelete": {
+    "description": "Generic Delete button label."
+  },
+
+  "commonEdit": "Edit",
+  "@commonEdit": {
+    "description": "Generic Edit tooltip/label."
+  },
+
+  "commonSave": "Save",
+  "@commonSave": {
+    "description": "Generic Save button label."
+  },
+
+  "badgeBuiltIn": "Built-in",
+  "@badgeBuiltIn": {
+    "description": "Small badge shown on built-in templates and provider profiles."
+  },
+
+  "badgeText": "Text",
+  "@badgeText": {
+    "description": "Small capability badge label for text translation."
+  },
+
+  "badgeImage": "Image",
+  "@badgeImage": {
+    "description": "Small capability badge label for image translation."
+  },
+
+  "apiKeysTitle": "API Keys",
+  "@apiKeysTitle": {
+    "description": "Title of the API Keys screen and its AppBar."
+  },
+
+  "apiKeysAddTooltip": "Add API Key",
+  "@apiKeysAddTooltip": {
+    "description": "Tooltip of the AppBar button that opens the add-API-key dialog."
+  },
+
+  "apiKeysEmptyState": "No API keys yet. Tap + to add one.",
+  "@apiKeysEmptyState": {
+    "description": "Empty-state message shown when the user has no API keys."
+  },
+
+  "apiKeysAddNewButton": "Add new key",
+  "@apiKeysAddNewButton": {
+    "description": "Trailing call-to-action button that adds a new API key."
+  },
+
+  "apiKeysAddTitle": "Add API Key",
+  "@apiKeysAddTitle": {
+    "description": "Title of the dialog that creates an API key."
+  },
+
+  "apiKeysEditTitle": "Edit API Key",
+  "@apiKeysEditTitle": {
+    "description": "Title of the dialog that edits an API key."
+  },
+
+  "apiKeysNameHint": "e.g. OpenRouter, Gemini",
+  "@apiKeysNameHint": {
+    "description": "Hint text of the API key name field."
+  },
+
+  "apiKeysNameRequired": "Name is required",
+  "@apiKeysNameRequired": {
+    "description": "Validation error when the API key name is empty."
+  },
+
+  "apiKeysValueLabel": "API Key Value",
+  "@apiKeysValueLabel": {
+    "description": "Label of the API key value field."
+  },
+
+  "apiKeysValueRequired": "API key value is required",
+  "@apiKeysValueRequired": {
+    "description": "Validation error when the API key value is empty."
+  },
+
+  "apiKeysSaveFailed": "Failed to save API key: {error}",
+  "@apiKeysSaveFailed": {
+    "description": "Snackbar error shown when persisting an API key fails; the technical error detail is appended.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "Secured storage unavailable"
+      }
+    }
+  },
+
+  "apiKeysDeleteTitle": "Delete API Key?",
+  "@apiKeysDeleteTitle": {
+    "description": "Title of the API key deletion confirmation dialog."
+  },
+
+  "apiKeysDeleteBody": "Are you sure you want to delete \"{name}\"? This cannot be undone.\n\nProfiles using this key will have their API key reference removed.",
+  "@apiKeysDeleteBody": {
+    "description": "Body of the API key deletion confirmation dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "OpenRouter"
+      }
+    }
+  },
+
+  "apiKeysEmptyValue": "(empty)",
+  "@apiKeysEmptyValue": {
+    "description": "Placeholder shown when an API key has no stored value."
+  },
+
+  "historySearchHint": "Search translations...",
+  "@historySearchHint": {
+    "description": "Hint text of the search bar on the History screen."
+  },
+
+  "historyClearAllTooltip": "Clear all history",
+  "@historyClearAllTooltip": {
+    "description": "Tooltip of the clear-all-history AppBar action."
+  },
+
+  "historyDeletedSnackbar": "Translation deleted",
+  "@historyDeletedSnackbar": {
+    "description": "Snackbar shown after deleting a history record."
+  },
+
+  "historyUndoAction": "UNDO",
+  "@historyUndoAction": {
+    "description": "Undo action label on the deletion snackbar."
+  },
+
+  "historyClearAllTitle": "Clear All History",
+  "@historyClearAllTitle": {
+    "description": "Title of the clear-all-history confirmation dialog."
+  },
+
+  "historyClearAllBody": "This will permanently delete all translation history. This action cannot be undone.",
+  "@historyClearAllBody": {
+    "description": "Body of the clear-all-history confirmation dialog."
+  },
+
+  "historyClearAllButton": "Clear All",
+  "@historyClearAllButton": {
+    "description": "Confirm button of the clear-all-history dialog."
+  },
+
+  "historyNoResults": "No results for '{query}'",
+  "@historyNoResults": {
+    "description": "Empty-search message; the query is wrapped in LRI/PDI isolates at the call site so mixed-script queries keep their order.",
+    "placeholders": {
+      "query": {
+        "type": "String",
+        "example": "مرحبا"
+      }
+    }
+  },
+
+  "historyEmptyState": "No translation history yet",
+  "@historyEmptyState": {
+    "description": "Empty-state message shown when there is no translation history."
+  },
+
+  "historyLoadFailed": "Failed to load history",
+  "@historyLoadFailed": {
+    "description": "Error-state headline shown when the history list fails to load."
+  },
+
+  "historyToday": "Today",
+  "@historyToday": {
+    "description": "Date label for a history record created today."
+  },
+
+  "historyYesterday": "Yesterday",
+  "@historyYesterday": {
+    "description": "Date label for a history record created yesterday."
+  },
+
+  "historyDaysAgo": "{count, plural, one{1 day ago} other{{count} days ago}}",
+  "@historyDaysAgo": {
+    "description": "Date label for a history record older than yesterday.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+
+  "historyDetailTitle": "Translation Details",
+  "@historyDetailTitle": {
+    "description": "AppBar title of the history detail screen."
+  },
+
+  "historyInputLabel": "Input",
+  "@historyInputLabel": {
+    "description": "Section label above the original input text on the history detail screen."
+  },
+
+  "historyOutputLabel": "Output",
+  "@historyOutputLabel": {
+    "description": "Section label above the translated output on the history detail screen."
+  },
+
+  "templatesAddTooltip": "Add Template",
+  "@templatesAddTooltip": {
+    "description": "Tooltip of the AppBar button that opens the template editor for a new template."
+  },
+
+  "templatesEmptyState": "No templates yet. Tap + to add one.",
+  "@templatesEmptyState": {
+    "description": "Empty-state message shown when the user has no templates."
+  },
+
+  "templatesUnknownProfile": "Unknown Profile",
+  "@templatesUnknownProfile": {
+    "description": "Group header in the templates list for templates whose profile no longer exists."
+  },
+
+  "templatesDeleteTitle": "Delete Template?",
+  "@templatesDeleteTitle": {
+    "description": "Title of the template deletion confirmation dialog."
+  },
+
+  "templatesDeleteBody": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
+  "@templatesDeleteBody": {
+    "description": "Body of the template deletion confirmation dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Professional Translator"
+      }
+    }
+  },
+
+  "templatesBuiltInWarning": "This is a built-in template. You can restore it by going to Settings and tapping \"Restore Built-in Items\".",
+  "@templatesBuiltInWarning": {
+    "description": "Warning shown in the template deletion dialog for built-in templates."
+  },
+
+  "profilesAddTooltip": "Add Profile",
+  "@profilesAddTooltip": {
+    "description": "Tooltip of the AppBar button that opens the profile editor for a new profile."
+  },
+
+  "profilesEmptyState": "No profiles yet. Tap + to add one.",
+  "@profilesEmptyState": {
+    "description": "Empty-state message shown when the user has no provider profiles."
+  },
+
+  "profilesDeleteTitle": "Delete Profile?",
+  "@profilesDeleteTitle": {
+    "description": "Title of the profile deletion confirmation dialog."
+  },
+
+  "profilesDeleteBody": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
+  "@profilesDeleteBody": {
+    "description": "Body of the profile deletion confirmation dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "My OpenRouter Profile"
+      }
+    }
+  },
+
+  "profilesBuiltInWarning": "This is a built-in profile. You can restore it by going to Settings and tapping \"Restore Built-in Items\".",
+  "@profilesBuiltInWarning": {
+    "description": "Warning shown in the profile deletion dialog for built-in profiles."
+  },
+
+  "profilesModelLabel": "Model: {model}",
+  "@profilesModelLabel": {
+    "description": "Model line on a profile card.",
+    "placeholders": {
+      "model": {
+        "type": "String",
+        "example": "gpt-4o"
+      }
+    }
+  },
+
+  "profilesApiKeyLabel": "API Key: {name}",
+  "@profilesApiKeyLabel": {
+    "description": "API key line on a profile card.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "OpenRouter"
+      }
+    }
+  },
+
+  "profileEditTitle": "Edit Profile",
+  "@profileEditTitle": {
+    "description": "AppBar title of the profile editor when editing an existing profile."
+  },
+
+  "profileNewTitle": "New Profile",
+  "@profileNewTitle": {
+    "description": "AppBar title of the profile editor when creating a new profile."
+  },
+
+  "profileNameHint": "e.g. My OpenRouter Profile",
+  "@profileNameHint": {
+    "description": "Hint text of the profile name field."
+  },
+
+  "profileProviderTypeLabel": "Provider Type",
+  "@profileProviderTypeLabel": {
+    "description": "Section label of the provider type selector."
+  },
+
+  "profileModelLabel": "Model",
+  "@profileModelLabel": {
+    "description": "Label of the model selector field."
+  },
+
+  "profileVisionModelLabel": "Vision Model (optional)",
+  "@profileVisionModelLabel": {
+    "description": "Label of the vision model selector field."
+  },
+
+  "profileSelectModelHint": "Select a model",
+  "@profileSelectModelHint": {
+    "description": "Placeholder in the model field when no model is chosen yet."
+  },
+
+  "profileSelectApiKeyFirstHint": "Select API key first",
+  "@profileSelectApiKeyFirstHint": {
+    "description": "Placeholder in the model fields when no API key is selected yet."
+  },
+
+  "profileVisionModelPlaceholder": "For image translation",
+  "@profileVisionModelPlaceholder": {
+    "description": "Placeholder in the vision model field when no vision model is chosen yet."
+  },
+
+  "profileApiKeyLabel": "API Key",
+  "@profileApiKeyLabel": {
+    "description": "Label of the API key selector field."
+  },
+
+  "profileFallbackApiKeyLabel": "Fallback API Key (optional)",
+  "@profileFallbackApiKeyLabel": {
+    "description": "Label of the fallback API key selector field."
+  },
+
+  "profileSelectModelTitle": "Select Model",
+  "@profileSelectModelTitle": {
+    "description": "Title of the model picker bottom sheet."
+  },
+
+  "profileSelectVisionModelTitle": "Select Vision Model",
+  "@profileSelectVisionModelTitle": {
+    "description": "Title of the vision model picker bottom sheet."
+  },
+
+  "profileSelectApiKeyTitle": "Select API Key",
+  "@profileSelectApiKeyTitle": {
+    "description": "Title of the API key picker bottom sheet."
+  },
+
+  "profileSelectFallbackApiKeyTitle": "Select Fallback API Key",
+  "@profileSelectFallbackApiKeyTitle": {
+    "description": "Title of the fallback API key picker bottom sheet."
+  },
+
+  "profileSearchModelsHint": "Search models...",
+  "@profileSearchModelsHint": {
+    "description": "Search hint of the model picker bottom sheets."
+  },
+
+  "profileRefreshModelsTooltip": "Refresh models",
+  "@profileRefreshModelsTooltip": {
+    "description": "Tooltip of the refresh-models icon button."
+  },
+
+  "profileLoadModelsFailed": "Failed to load models: {error}",
+  "@profileLoadModelsFailed": {
+    "description": "Snackbar error shown when fetching the model list fails; the technical error detail is appended.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "Connection refused"
+      }
+    }
+  },
+
+  "profileNameRequired": "Profile name is required.",
+  "@profileNameRequired": {
+    "description": "Snackbar error shown when saving a profile without a name."
+  },
+
+  "profileModelRequired": "Model selection is required.",
+  "@profileModelRequired": {
+    "description": "Snackbar error shown when saving a profile without a chosen model."
+  },
+
+  "profileBaseUrlInvalid": "Enter a valid URL with http:// or https:// scheme.",
+  "@profileBaseUrlInvalid": {
+    "description": "Validation error when the Base URL has no valid scheme."
+  },
+
+  "profileBaseUrlHttpsRequired": "Insecure HTTP URLs are not allowed for remote endpoints. Use https:// (http is only permitted for localhost/127.0.0.1).",
+  "@profileBaseUrlHttpsRequired": {
+    "description": "Validation error when a remote Base URL uses plain http instead of https."
+  },
+
+  "profileBaseUrlHttpsHint": "Enter a valid URL starting with https:// (or http://localhost for local models).",
+  "@profileBaseUrlHttpsHint": {
+    "description": "Validation error when the Base URL cannot be parsed as a URL."
+  },
+
+  "profileOpenAiSettingsTitle": "OpenAI-Compatible Settings",
+  "@profileOpenAiSettingsTitle": {
+    "description": "Section header for the OpenAI-compatible provider settings."
+  },
+
+  "profileBaseUrlLabel": "Base URL",
+  "@profileBaseUrlLabel": {
+    "description": "Label of the Base URL field for OpenAI-compatible providers."
+  },
+
+  "profileModelAccessTitle": "An API key is required first",
+  "@profileModelAccessTitle": {
+    "description": "Title of the bottom sheet shown when tapping the model field without an API key."
+  },
+
+  "profileModelAccessBody": "Pick an existing key from your list, or add a new one to start fetching models.",
+  "@profileModelAccessBody": {
+    "description": "Body of the model-access bottom sheet."
+  },
+
+  "profileModelAccessPickExisting": "Pick an existing key",
+  "@profileModelAccessPickExisting": {
+    "description": "Option that opens the API key picker."
+  },
+
+  "profileModelAccessAddNew": "Add a new key",
+  "@profileModelAccessAddNew": {
+    "description": "Option that opens the API keys screen to add a new key."
   }
 }

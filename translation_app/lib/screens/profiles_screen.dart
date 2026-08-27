@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:translation_core/translation_core.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
 import '../services/settings_repository.dart';
 import 'profile_edit_screen.dart';
@@ -17,14 +18,15 @@ class ProfilesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(profilesProvider);
     final apiKeys = ref.watch(apiKeysProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Provider Profiles'),
+        title: Text(l10n.settingsProviderProfiles),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Add Profile',
+            tooltip: l10n.profilesAddTooltip,
             onPressed: () => _navigateToEdit(context, null),
           ),
         ],
@@ -32,7 +34,7 @@ class ProfilesScreen extends ConsumerWidget {
       body: profiles.isEmpty
           ? Center(
               child: Text(
-                'No profiles yet. Tap + to add one.',
+                l10n.profilesEmptyState,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -80,18 +82,16 @@ class ProfilesScreen extends ConsumerWidget {
     WidgetRef ref,
     ProviderProfile profile,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Profile?'),
+        title: Text(l10n.profilesDeleteTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to delete "${profile.name}"? '
-              'This cannot be undone.',
-            ),
+            Text(l10n.profilesDeleteBody(profile.name)),
             if (profile.isBuiltIn) ...[
               const SizedBox(height: 12),
               Container(
@@ -110,8 +110,7 @@ class ProfilesScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'This is a built-in profile. You can restore it by '
-                        'going to Settings and tapping "Restore Built-in Items".',
+                        l10n.profilesBuiltInWarning,
                         style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                           color: Theme.of(ctx).colorScheme.onErrorContainer,
                         ),
@@ -126,14 +125,14 @@ class ProfilesScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.appCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -162,6 +161,7 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -189,15 +189,15 @@ class _ProfileCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Model: ${profile.model}',
+                      l10n.profilesModelLabel(profile.model),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (apiKeyName != null) ...[
+                    if (apiKeyName case final String resolvedKeyName) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'API Key: $apiKeyName',
+                        l10n.profilesApiKeyLabel(resolvedKeyName),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -211,7 +211,7 @@ class _ProfileCard extends StatelessWidget {
                   Icons.delete_outline,
                   color: theme.colorScheme.error,
                 ),
-                tooltip: 'Delete',
+                tooltip: l10n.commonDelete,
                 onPressed: onDelete,
               ),
             ],
@@ -289,7 +289,7 @@ class _BuiltInBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        'Built-in',
+        AppLocalizations.of(context).badgeBuiltIn,
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.primary,
           fontSize: 10,

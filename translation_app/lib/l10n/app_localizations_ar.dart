@@ -81,6 +81,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeTranslateButton => 'ترجمة';
 
   @override
+  String get historyAutoDetected => 'تلقائي';
+
+  @override
   String get homeClearButton => 'مسح';
 
   @override
@@ -119,6 +122,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get homeErrorFileBytes => 'تعذّر قراءة بيانات الملف.';
+
+  @override
+  String get shareFileTooLarge =>
+      'هذا الملف كبير جدًا على الفتح (أكثر من 50 ميجابايت). اختر ملفًا أصغر.';
 
   @override
   String get homeFileWillBeChunked => 'سيتم ترجمة الملف على دفعات';
@@ -242,6 +249,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsArticlesSubtitle => 'أدلة سريعة وشروحات';
+
+  @override
+  String get settingsTips => 'نصائح';
+
+  @override
+  String get settingsTipsSubtitle => 'نصائح سريعة وأدلة خطوة بخطوة';
+
+  @override
+  String get tipsQuickTipsHeader => 'نصائح سريعة';
+
+  @override
+  String get tipsUsageHeader => 'كيفية استخدام التطبيق';
+
+  @override
+  String get tipsSetupHeader => 'الإعداد خطوة بخطوة';
 
   @override
   String get articleLoadError => 'تعذّر تحميل المقال.';
@@ -489,6 +511,13 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get tplOutLangFixedTitle => 'لغة إخراج ثابتة (بدون متغيّر)';
+
+  @override
+  String get tplOutLangFixedSubtitle =>
+      'هذا القالب يعمل بدون متغيّر اللغة المستهدفة — سيُخفى اختيار اللغة في الصفحة الرئيسية، ولن يُعيَّن للأوفّرلاي.';
+
+  @override
   String get tplEditSaveButton => 'حفظ';
 
   @override
@@ -526,4 +555,311 @@ class AppLocalizationsAr extends AppLocalizations {
   String updateAvailableSubtitle(String version) {
     return 'الإصدار $version متاح.';
   }
+
+  @override
+  String get copyAsPlain => 'نسخ كنص عادي';
+
+  @override
+  String get copyAsMarkdown => 'نسخ كـ Markdown';
+
+  @override
+  String get shareAsPlain => 'مشاركة كنص عادي';
+
+  @override
+  String get shareAsMarkdown => 'مشاركة كـ Markdown (.md)';
+
+  @override
+  String get saveToFile => 'حفظ إلى ملف';
+
+  @override
+  String get copyOptionsTitle => 'خيارات النسخ';
+
+  @override
+  String get shareOptionsTitle => 'خيارات المشاركة';
+
+  @override
+  String get sheetPlainSubtitle => 'بدون تنسيق Markdown';
+
+  @override
+  String get sheetMarkdownFileSubtitle => 'ملف نصي بالتنسيق الأصلي';
+
+  @override
+  String get sheetCopyMarkdownSubtitle => 'مع التنسيق الأصلي';
+
+  @override
+  String get sheetSaveToFileSubtitle => 'اختر مكان الحفظ من ورقة المشاركة';
+
+  @override
+  String get commonName => 'الاسم';
+
+  @override
+  String get commonDelete => 'حذف';
+
+  @override
+  String get commonEdit => 'تعديل';
+
+  @override
+  String get commonSave => 'حفظ';
+
+  @override
+  String get badgeBuiltIn => 'مضمّن';
+
+  @override
+  String get badgeText => 'نص';
+
+  @override
+  String get badgeImage => 'صورة';
+
+  @override
+  String get apiKeysTitle => 'مفاتيح API';
+
+  @override
+  String get apiKeysAddTooltip => 'إضافة مفتاح API';
+
+  @override
+  String get apiKeysEmptyState =>
+      'لا توجد مفاتيح API بعد. اضغط + لإضافة مفتاح.';
+
+  @override
+  String get apiKeysAddNewButton => 'إضافة مفتاح جديد';
+
+  @override
+  String get apiKeysAddTitle => 'إضافة مفتاح API';
+
+  @override
+  String get apiKeysEditTitle => 'تعديل مفتاح API';
+
+  @override
+  String get apiKeysNameHint => 'مثال: OpenRouter أو Gemini';
+
+  @override
+  String get apiKeysNameRequired => 'الاسم مطلوب';
+
+  @override
+  String get apiKeysValueLabel => 'قيمة مفتاح API';
+
+  @override
+  String get apiKeysValueRequired => 'قيمة مفتاح API مطلوبة';
+
+  @override
+  String apiKeysSaveFailed(String error) {
+    return 'فشل حفظ مفتاح API: $error';
+  }
+
+  @override
+  String get apiKeysDeleteTitle => 'حذف مفتاح API؟';
+
+  @override
+  String apiKeysDeleteBody(String name) {
+    return 'هل أنت متأكد من حذف \"$name\"؟ لا يمكن التراجع عن هذا.\n\nستتم إزالة مرجع مفتاح API من ملفات الموفّر التي تستخدمه.';
+  }
+
+  @override
+  String get apiKeysEmptyValue => '(فارغ)';
+
+  @override
+  String get historySearchHint => 'البحث في الترجمات...';
+
+  @override
+  String get historyClearAllTooltip => 'مسح السجل بالكامل';
+
+  @override
+  String get historyDeletedSnackbar => 'تم حذف الترجمة';
+
+  @override
+  String get historyUndoAction => 'تراجع';
+
+  @override
+  String get historyClearAllTitle => 'مسح السجل بالكامل';
+
+  @override
+  String get historyClearAllBody =>
+      'سيؤدي هذا إلى حذف كل سجل الترجمة نهائيًا. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get historyClearAllButton => 'مسح الكل';
+
+  @override
+  String historyNoResults(String query) {
+    return 'لا توجد نتائج لـ \'$query\'';
+  }
+
+  @override
+  String get historyEmptyState => 'لا يوجد سجل ترجمة بعد';
+
+  @override
+  String get historyLoadFailed => 'تعذّر تحميل السجل';
+
+  @override
+  String get historyToday => 'اليوم';
+
+  @override
+  String get historyYesterday => 'أمس';
+
+  @override
+  String historyDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count يوم',
+      many: 'منذ $count يومًا',
+      few: 'منذ $count أيام',
+      two: 'منذ يومين',
+      one: 'منذ يوم واحد',
+      zero: 'منذ 0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyDetailTitle => 'تفاصيل الترجمة';
+
+  @override
+  String get historyInputLabel => 'النص المُدخل';
+
+  @override
+  String get historyOutputLabel => 'الترجمة الناتجة';
+
+  @override
+  String get templatesAddTooltip => 'إضافة قالب';
+
+  @override
+  String get templatesEmptyState => 'لا توجد قوالب بعد. اضغط + لإضافة قالب.';
+
+  @override
+  String get templatesUnknownProfile => 'ملف موفّر غير معروف';
+
+  @override
+  String get templatesDeleteTitle => 'حذف القالب؟';
+
+  @override
+  String templatesDeleteBody(String name) {
+    return 'هل أنت متأكد من حذف \"$name\"؟ لا يمكن التراجع عن هذا.';
+  }
+
+  @override
+  String get templatesBuiltInWarning =>
+      'هذا قالب مضمّن. يمكنك استعادته من الإعدادات بالضغط على \"استعادة العناصر المضمّنة\".';
+
+  @override
+  String get profilesAddTooltip => 'إضافة ملف موفّر';
+
+  @override
+  String get profilesEmptyState =>
+      'لا توجد ملفات موفّر بعد. اضغط + لإضافة ملف.';
+
+  @override
+  String get profilesDeleteTitle => 'حذف ملف الموفّر؟';
+
+  @override
+  String profilesDeleteBody(String name) {
+    return 'هل أنت متأكد من حذف \"$name\"؟ لا يمكن التراجع عن هذا.';
+  }
+
+  @override
+  String get profilesBuiltInWarning =>
+      'هذا ملف موفّر مضمّن. يمكنك استعادته من الإعدادات بالضغط على \"استعادة العناصر المضمّنة\".';
+
+  @override
+  String profilesModelLabel(String model) {
+    return 'النموذج: $model';
+  }
+
+  @override
+  String profilesApiKeyLabel(String name) {
+    return 'مفتاح API: $name';
+  }
+
+  @override
+  String get profileEditTitle => 'تعديل ملف الموفّر';
+
+  @override
+  String get profileNewTitle => 'ملف موفّر جديد';
+
+  @override
+  String get profileNameHint => 'مثال: ملف OpenRouter الخاص بي';
+
+  @override
+  String get profileProviderTypeLabel => 'نوع الموفّر';
+
+  @override
+  String get profileModelLabel => 'النموذج';
+
+  @override
+  String get profileVisionModelLabel => 'نموذج الرؤية (اختياري)';
+
+  @override
+  String get profileSelectModelHint => 'اختر نموذجًا';
+
+  @override
+  String get profileSelectApiKeyFirstHint => 'اختر مفتاح API أولًا';
+
+  @override
+  String get profileVisionModelPlaceholder => 'لترجمة الصور';
+
+  @override
+  String get profileApiKeyLabel => 'مفتاح API';
+
+  @override
+  String get profileFallbackApiKeyLabel => 'مفتاح API احتياطي (اختياري)';
+
+  @override
+  String get profileSelectModelTitle => 'اختر النموذج';
+
+  @override
+  String get profileSelectVisionModelTitle => 'اختر نموذج الرؤية';
+
+  @override
+  String get profileSelectApiKeyTitle => 'اختر مفتاح API';
+
+  @override
+  String get profileSelectFallbackApiKeyTitle => 'اختر مفتاح API الاحتياطي';
+
+  @override
+  String get profileSearchModelsHint => 'البحث عن نماذج...';
+
+  @override
+  String get profileRefreshModelsTooltip => 'تحديث النماذج';
+
+  @override
+  String profileLoadModelsFailed(String error) {
+    return 'فشل تحميل النماذج: $error';
+  }
+
+  @override
+  String get profileNameRequired => 'اسم ملف الموفّر مطلوب.';
+
+  @override
+  String get profileModelRequired => 'يجب اختيار نموذج.';
+
+  @override
+  String get profileBaseUrlInvalid =>
+      'أدخل رابطًا صالحًا يبدأ بـ http:// أو https://.';
+
+  @override
+  String get profileBaseUrlHttpsRequired =>
+      'عناوين http:// غير مسموحة للخواديم البعيدة. استخدم https:// (يُسمح بـ http فقط لـ localhost/127.0.0.1).';
+
+  @override
+  String get profileBaseUrlHttpsHint =>
+      'أدخل رابطًا صالحًا يبدأ بـ https:// (أو http://localhost للنماذج المحلية).';
+
+  @override
+  String get profileOpenAiSettingsTitle => 'إعدادات متوافقة مع OpenAI';
+
+  @override
+  String get profileBaseUrlLabel => 'رابط الأساس (Base URL)';
+
+  @override
+  String get profileModelAccessTitle => 'يلزم تحديد مفتاح API أولًا';
+
+  @override
+  String get profileModelAccessBody =>
+      'اختر مفتاحًا موجودًا من قائمتك، أو أضف مفتاحًا جديدًا للبدء بجلب النماذج.';
+
+  @override
+  String get profileModelAccessPickExisting => 'اختر مفتاحًا موجودًا';
+
+  @override
+  String get profileModelAccessAddNew => 'إضافة مفتاح جديد';
 }

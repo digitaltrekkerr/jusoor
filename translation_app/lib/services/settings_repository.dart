@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:translation_core/translation_core.dart';
@@ -31,10 +32,7 @@ class ApiKeyEntry {
 }
 
 /// Modes for the overlay display size.
-enum OverlaySizeMode {
-  compressed,
-  full,
-}
+enum OverlaySizeMode { compressed, full }
 
 /// Repository for persisting application settings.
 ///
@@ -65,14 +63,19 @@ class SettingsRepository {
   static const _selectedOverlayTemplateKey = 'selected_overlay_template';
   static const _dataMigratedV2Key = 'data_migrated_v2';
   static const _builtInsRevisionKey = 'built_ins_revision';
-  static const int _currentBuiltInsRevision = 2;
+  static const int _currentBuiltInsRevision = 3;
 
   // ── Retained preference keys ───────────────────────────────────────
   static const _systemPromptKey = 'system_prompt';
   static const _defaultTargetLanguageKey = 'default_target_language';
   static const _wordLimitKey = 'word_limit';
   static const _overlaySizeModeKey = 'overlay_size_mode';
-  static const _themeModeKey = 'theme_mode';
+
+  /// SharedPreferences key storing the app [ThemeMode] name (`system`,
+  /// `light`, or `dark`). Public so the overlay engine (a separate Flutter
+  /// engine that cannot build a repository — it has no secure storage) can
+  /// read the same setting directly.
+  static const themeModeKey = 'theme_mode';
 
   // ── Pre-built profile IDs ──────────────────────────────────────────
   static const _openrouterDefaultProfileId = 'openrouter_default_profile';
@@ -100,6 +103,26 @@ class SettingsRepository {
   // ── Pre-built API key IDs ──────────────────────────────────────────
   static const _openrouterApiKeyId = 'openrouter_api_key_entry';
   static const _customApiKeyId = 'custom_api_key_entry';
+
+  /// Returns the original (first-install) system prompt for a built-in
+  /// template, or `null` when [templateId] is not a known built-in id.
+  ///
+  /// Used by the template editor's "Reset to Default" action so that
+  /// resetting a built-in template brings back ITS OWN prompt from the
+  /// shipped catalog — not a generic placeholder. Kept in sync with the
+  /// definitions used by [restoreBuiltInItems] and
+  /// [_applyBuiltInRevisions].
+  static String? builtInSystemPromptFor(String templateId) {
+    switch (templateId) {
+      case _professionalTranslatorTemplateId:
+      case _openaiTranslatorTemplateId:
+        return systemPromptTemplate;
+      case _geminiTranslatorTemplateId:
+        return geminiReconstructionTemplatePrompt;
+      default:
+        return null;
+    }
+  }
 
   /// Creates a [SettingsRepository] with the given storage backends.
   const SettingsRepository({
@@ -212,8 +235,8 @@ class SettingsRepository {
   Future<void> setDefaultTargetLanguage(String value) =>
       _prefs.setString(_defaultTargetLanguageKey, value);
 
-  /// Returns the word limit, defaulting to `5000`.
-  int get wordLimit => _prefs.getInt(_wordLimitKey) ?? 5000;
+  /// Returns the word limit, defaulting to `10000`.
+  int get wordLimit => _prefs.getInt(_wordLimitKey) ?? 10000;
 
   /// Persists the word limit.
   Future<void> setWordLimit(int value) => _prefs.setInt(_wordLimitKey, value);
@@ -234,7 +257,7 @@ class SettingsRepository {
 
   /// Returns the theme mode, defaulting to [ThemeMode.system].
   ThemeMode get themeMode {
-    final v = _prefs.getString(_themeModeKey);
+    final v = _prefs.getString(themeModeKey);
     return ThemeMode.values.firstWhere(
       (m) => m.name == v,
       orElse: () => ThemeMode.system,
@@ -243,7 +266,7 @@ class SettingsRepository {
 
   /// Persists the theme mode.
   Future<void> setThemeMode(ThemeMode mode) async {
-    await _prefs.setString(_themeModeKey, mode.name);
+    await _prefs.setString(themeModeKey, mode.name);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -260,7 +283,9 @@ class SettingsRepository {
           .map((e) => ApiKeyEntry.fromJson(e as Map<String, dynamic>))
           .toList();
     } on FormatException catch (e) {
-      debugPrint('Failed to decode API keys index: $e');
+      if (kDebugMode) {
+        debugPrint('Failed to decode API keys index: $e');
+      }
       return [];
     }
   }
@@ -304,7 +329,9 @@ class SettingsRepository {
           .map((e) => ProviderProfile.fromJson(e as Map<String, dynamic>))
           .toList();
     } on FormatException catch (e) {
-      debugPrint('Failed to decode provider profiles: $e');
+      if (kDebugMode) {
+        debugPrint('Failed to decode provider profiles: $e');
+      }
       return [];
     }
   }
@@ -353,7 +380,9 @@ class SettingsRepository {
           .map((e) => PromptTemplate.fromJson(e as Map<String, dynamic>))
           .toList();
     } on FormatException catch (e) {
-      debugPrint('Failed to decode prompt templates: $e');
+      if (kDebugMode) {
+        debugPrint('Failed to decode prompt templates: $e');
+      }
       return [];
     }
   }
@@ -480,7 +509,9 @@ class SettingsRepository {
         migratedOpenRouterApiKeyId = entry.id;
       }
     } catch (e) {
-      debugPrint('Migration step 1 (OpenRouter API key) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 1 (OpenRouter API key) failed: $e');
+      }
     }
 
     // ── 2. Migrate custom provider settings ──────────────────────────
@@ -493,9 +524,11 @@ class SettingsRepository {
             await _secureStorage.read(key: _legacyCustomEndpointKey) ?? '';
 
         if (customEndpoint.isEmpty) {
-          debugPrint(
-            'Migration step 2: Skipping custom provider — no endpoint URL',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              'Migration step 2: Skipping custom provider — no endpoint URL',
+            );
+          }
         } else {
           final customEntry = ApiKeyEntry(id: _customApiKeyId, name: 'Custom');
           await saveApiKey(customEntry, customEndpoint);
@@ -512,9 +545,11 @@ class SettingsRepository {
           );
           await saveProfile(customProfile);
         }
-}
+      }
     } catch (e) {
-      debugPrint('Migration step 2 (custom provider migration) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 2 (custom provider migration) failed: $e');
+      }
     }
 
     // ── Ensure built-in profiles exist before template creation ───────
@@ -529,13 +564,15 @@ class SettingsRepository {
           name: 'OpenRouter Default',
           providerType: ProviderType.openrouter,
           apiKeyId: migratedOpenRouterApiKeyId,
-          model: 'openrouter/free',
-          visionModel: 'openrouter/free',
+          model: kDefaultOpenRouterModel,
+          visionModel: kDefaultOpenRouterModel,
           isBuiltIn: true,
         );
         await saveProfile(openrouterDefault);
       } catch (e) {
-        debugPrint('Migration step 3 (OpenRouter profile) failed: $e');
+        if (kDebugMode) {
+          debugPrint('Migration step 3 (OpenRouter profile) failed: $e');
+        }
       }
     }
 
@@ -545,13 +582,15 @@ class SettingsRepository {
           id: _geminiFlashProfileId,
           name: 'Gemini Flash',
           providerType: ProviderType.gemini,
-          model: 'gemini-2.5-flash',
-          visionModel: 'gemini-2.5-flash',
+          model: kDefaultGeminiModel,
+          visionModel: kDefaultGeminiModel,
           isBuiltIn: true,
         );
         await saveProfile(geminiFlash);
       } catch (e) {
-        debugPrint('Migration step 4 (Gemini profile) failed: $e');
+        if (kDebugMode) {
+          debugPrint('Migration step 4 (Gemini profile) failed: $e');
+        }
       }
     }
 
@@ -561,14 +600,16 @@ class SettingsRepository {
           id: _openaiProfileId,
           name: 'OpenAI',
           providerType: ProviderType.openaiCompatible,
-          model: 'gpt-5.4-nano',
-          visionModel: 'gpt-5.4-nano',
+          model: kDefaultOpenAiModel,
+          visionModel: kDefaultOpenAiModel,
           baseUrl: 'https://api.openai.com/v1',
           isBuiltIn: true,
         );
         await saveProfile(openai);
       } catch (e) {
-        debugPrint('Migration step 5 (OpenAI profile) failed: $e');
+        if (kDebugMode) {
+          debugPrint('Migration step 5 (OpenAI profile) failed: $e');
+        }
       }
     }
 
@@ -576,10 +617,12 @@ class SettingsRepository {
     try {
       final openrouterProfile = getProfile(_openrouterDefaultProfileId);
       if (openrouterProfile == null) {
-        debugPrint(
-          'Migration step 7: Skipping OpenRouter template — '
-          'OpenRouter profile not found',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Migration step 7: Skipping OpenRouter template — '
+            'OpenRouter profile not found',
+          );
+        }
       } else {
         final openrouterTranslator = PromptTemplate(
           id: _professionalTranslatorTemplateId,
@@ -593,17 +636,21 @@ class SettingsRepository {
         await saveTemplate(openrouterTranslator);
       }
     } catch (e) {
-      debugPrint('Migration step 7 (OpenRouter template) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 7 (OpenRouter template) failed: $e');
+      }
     }
 
     // ── 8. Create "Gemini Translator" template ───────────────────────
     try {
       final geminiProfile = getProfile(_geminiFlashProfileId);
       if (geminiProfile == null) {
-        debugPrint(
-          'Migration step 8: Skipping Gemini template — '
-          'Gemini profile not found',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Migration step 8: Skipping Gemini template — '
+            'Gemini profile not found',
+          );
+        }
       } else {
         final geminiTranslator = PromptTemplate(
           id: _geminiTranslatorTemplateId,
@@ -617,17 +664,21 @@ class SettingsRepository {
         await saveTemplate(geminiTranslator);
       }
     } catch (e) {
-      debugPrint('Migration step 8 (Gemini template) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 8 (Gemini template) failed: $e');
+      }
     }
 
     // ── 9. Create "OpenAI Translator" template ──────────────────────
     try {
       final openaiProfile = getProfile(_openaiProfileId);
       if (openaiProfile == null) {
-        debugPrint(
-          'Migration step 9: Skipping OpenAI template — '
-          'OpenAI profile not found',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Migration step 9: Skipping OpenAI template — '
+            'OpenAI profile not found',
+          );
+        }
       } else {
         final openaiTranslator = PromptTemplate(
           id: _openaiTranslatorTemplateId,
@@ -641,7 +692,9 @@ class SettingsRepository {
         await saveTemplate(openaiTranslator);
       }
     } catch (e) {
-      debugPrint('Migration step 9 (OpenAI template) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 9 (OpenAI template) failed: $e');
+      }
     }
 
     // ── 10. Set default selections ───────────────────────────────────
@@ -655,7 +708,9 @@ class SettingsRepository {
         await setSelectedOverlayTemplateId(_professionalTranslatorTemplateId);
       }
     } catch (e) {
-      debugPrint('Migration step 10 (Default selections) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 10 (Default selections) failed: $e');
+      }
     }
 
     // ── 12. Validate migration before marking complete ───────────────
@@ -675,19 +730,34 @@ class SettingsRepository {
       if (criticalProfilesExist) {
         await _prefs.setBool(_dataMigratedV2Key, true);
         await _prefs.setInt(_builtInsRevisionKey, _currentBuiltInsRevision);
-        debugPrint('Migration completed successfully.');
+        if (kDebugMode) {
+          debugPrint('Migration completed successfully.');
+        }
       } else {
-        debugPrint(
-          'Migration validation failed: critical profiles missing. '
-          'Migration will retry on next launch.',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Migration validation failed: critical profiles missing. '
+            'Migration will retry on next launch.',
+          );
+        }
         // Do NOT set the flag — migration will retry next launch.
       }
     } catch (e) {
-      debugPrint('Migration step 12 (Validate & mark complete) failed: $e');
+      if (kDebugMode) {
+        debugPrint('Migration step 12 (Validate & mark complete) failed: $e');
+      }
       // Do NOT set the flag on error either.
     }
   }
+
+  /// Default built-in model for the OpenRouter profile (text + vision).
+  static const kDefaultOpenRouterModel = 'openai/gpt-5.6-luna';
+
+  /// Default built-in model for the Gemini profile (text + vision).
+  static const kDefaultGeminiModel = 'gemini-3.5-flash-lite';
+
+  /// Default built-in model for the OpenAI profile.
+  static const kDefaultOpenAiModel = 'gpt-5.4-nano';
 
   /// Pushes the latest built-in template definitions into existing templates.
   ///
@@ -709,6 +779,34 @@ class SettingsRepository {
           gemini.copyWith(
             name: _geminiReconstructionTranslatorName,
             systemPrompt: geminiReconstructionTemplatePrompt,
+          ),
+        );
+      }
+    }
+
+    // ── Revision 3: built-in profiles adopt the new default models.
+    //    Only bumps profiles that still use the OLD built-in defaults —
+    //    user customizations (different model) are left untouched.
+    if (fromRevision < 3) {
+      const legacyOpenRouterModel = 'openrouter/free';
+      const legacyGeminiModel = 'gemini-2.5-flash';
+
+      final openrouter = getProfile(_openrouterDefaultProfileId);
+      if (openrouter != null && openrouter.model == legacyOpenRouterModel) {
+        await saveProfile(
+          openrouter.copyWith(
+            model: kDefaultOpenRouterModel,
+            visionModel: kDefaultOpenRouterModel,
+          ),
+        );
+      }
+
+      final gemini = getProfile(_geminiFlashProfileId);
+      if (gemini != null && gemini.model == legacyGeminiModel) {
+        await saveProfile(
+          gemini.copyWith(
+            model: kDefaultGeminiModel,
+            visionModel: kDefaultGeminiModel,
           ),
         );
       }
@@ -742,8 +840,8 @@ class SettingsRepository {
         name: 'OpenRouter Default',
         providerType: ProviderType.openrouter,
         apiKeyId: openrouterApiKeyId,
-        model: 'openrouter/free',
-        visionModel: 'openrouter/free',
+        model: kDefaultOpenRouterModel,
+        visionModel: kDefaultOpenRouterModel,
         isBuiltIn: true,
       );
       await saveProfile(openrouterDefault);
@@ -754,8 +852,8 @@ class SettingsRepository {
         id: _geminiFlashProfileId,
         name: 'Gemini Flash',
         providerType: ProviderType.gemini,
-        model: 'gemini-2.5-flash',
-        visionModel: 'gemini-2.5-flash',
+        model: kDefaultGeminiModel,
+        visionModel: kDefaultGeminiModel,
         isBuiltIn: true,
       );
       await saveProfile(geminiFlash);
@@ -766,8 +864,8 @@ class SettingsRepository {
         id: _openaiProfileId,
         name: 'OpenAI',
         providerType: ProviderType.openaiCompatible,
-        model: 'gpt-5.4-nano',
-        visionModel: 'gpt-5.4-nano',
+        model: kDefaultOpenAiModel,
+        visionModel: kDefaultOpenAiModel,
         baseUrl: 'https://api.openai.com/v1',
         isBuiltIn: true,
       );

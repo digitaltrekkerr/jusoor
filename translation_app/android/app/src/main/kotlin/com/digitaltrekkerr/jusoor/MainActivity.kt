@@ -27,12 +27,14 @@ class MainActivity : FlutterActivity() {
         var clipboardCacheTimestamp: Long = 0L
         const val CACHE_TTL_MS = 60 * 1000L
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+
+        /** 50 MB ceiling for shared-file reads, matching the Dart side. */
+        private const val MAX_SHARED_FILE_BYTES: Long = 50L * 1024L * 1024L
     }
 
     private val CHANNEL = "dev.flutter.org/overlay_permission"
     private val OVERLAY_CHANNEL = "x-slayer/overlay"
     private val SHARE_CHANNEL = "dev.flutter.org/share"
-    private val SHOW_OVERLAY_PREF = "show_overlay_direct"
     private var clipboardManager: ClipboardManager? = null
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
         cacheClipboard()
@@ -40,8 +42,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
-        clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboardManager =
+            getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     }
 
     override fun onResume() {
@@ -99,24 +101,6 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleIntent(intent)
-    }
-
-    private fun handleIntent(intent: Intent?) {
-        val showOverlayDirect = intent?.getBooleanExtra("show_overlay_direct", false) ?: false
-        
-        if (showOverlayDirect) {
-            Log.i(TAG, "Direct overlay launch requested")
-            val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean(SHOW_OVERLAY_PREF, true).apply()
-            // Actually launch the overlay service. Without this call the flag
-            // is written but no one reads it — the Dart entry-point
-            // `checkShowOverlayDirect` exists but is never invoked, so the
-            // overlay never appears from `am start ... --ez show_overlay_direct true`.
-            // The Quick Settings Tile path still works because it goes through
-            // OverlayRelayActivity directly.
-            showOverlay()
-        }
     }
 
     private fun showOverlay(): Boolean {
@@ -213,14 +197,6 @@ class MainActivity : FlutterActivity() {
                         val granted = NotificationManagerCompat.from(this).areNotificationsEnabled()
                         result.success(granted)
                     }
-                    "checkShowOverlayDirect" -> {
-                        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                        val showDirect = prefs.getBoolean(SHOW_OVERLAY_PREF, false)
-                        if (showDirect) {
-                            prefs.edit().remove(SHOW_OVERLAY_PREF).apply()
-                        }
-                        result.success(showDirect)
-                    }
                     "getScreenDimensions" -> {
                         val fullHeight = getFullScreenHeight()
                         val navBarHeight = getNavBarHeight()
@@ -232,6 +208,13 @@ class MainActivity : FlutterActivity() {
                         )
                         Log.d(TAG, "Screen dimensions: fullHeight=$fullHeight, navBar=$navBarHeight, statusBar=$statusBarHeight")
                         result.success(resultData)
+                    }
+                    "getSupportedAbis" -> {
+                        // Ordered by the system's preference; pick the first
+                        // entry that matches a published APK variant so the
+                        // update checker downloads the right split-per-abi
+                        // artifact instead of guessing.
+                        result.success(Build.SUPPORTED_ABIS.toList())
                     }
                     "setWindowFullScreen" -> {
                         try {
@@ -305,17 +288,35 @@ class MainActivity : FlutterActivity() {
                     "readContentUri" -> {
                         val uri = call.arguments as String
                         try {
-                            val bytes = contentResolver.openInputStream(
-                                android.net.Uri.parse(uri)
-                            )?.use { it.readBytes() }
-                            if (bytes != null) {
-                                result.success(bytes)
-                            } else {
+                            val parsed = android.net.Uri.parse(uri)
+                            // Size ceiling: refuse to read shared files over
+                            // 50 MB so a giant content URI never OOMs the
+                            // process. Read the descriptor length before
+                            // loading bytes into memory.
+                            val afd = contentResolver.openAssetFileDescriptor(parsed, "r")
+                            if (afd == null) {
                                 result.error(
                                     "READ_ERROR",
-                                    "Failed to open input stream for $uri",
+                                    "Failed to open content URI: $uri",
                                     null
                                 )
+                            } else {
+                                afd.use { descriptor ->
+                                    val length = descriptor.length
+                                    if (length > MAX_SHARED_FILE_BYTES) {
+                                        result.error(
+                                            "FILE_TOO_LARGE",
+                                            "Shared file exceeds 50 MB limit",
+                                            length
+                                        )
+                                    } else {
+                                        val bytes = descriptor
+                                            .createInputStream()
+                                            .buffered()
+                                            .readBytes()
+                                        result.success(bytes)
+                                    }
+                                }
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to read content URI: $uri", e)

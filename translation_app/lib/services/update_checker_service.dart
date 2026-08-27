@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -24,9 +25,9 @@ class UpdateInfo {
   /// Human-facing URL of the release notes page on GitHub.
   final String releaseUrl;
 
-  /// Direct download URL of the `app-release.apk` asset, or `null`
-  /// when the release did not upload one (e.g. a draft or a release
-  /// created manually without the workflow).
+  /// Direct download URL of the APK for the device's ABI (e.g.
+  /// `jusoor-arm64-v8a.apk`), or `null` when the release did not upload
+  /// one (e.g. a draft or a release created manually without the workflow).
   final String? apkUrl;
 
   /// Markdown body of the release. Optional; only used for the future
@@ -59,6 +60,15 @@ class UpdateInfo {
 /// enough that a hung request never blocks the Settings screen, and
 /// every error path collapses to [UpdateInfo.none] so the UI never
 /// has to know whether the check ran at all.
+///
+/// CI TAG POLICY — WHY `build-<sha>` TAGS ARE IGNORED (deliberate, not a
+/// bug): the repo's release workflow publishes a GitHub Release tagged
+/// `build-<sha>` for EVERY commit that lands on `main`. Those tags are
+/// synthesized per-commit CI artifacts, not real releases. This service
+/// intentionally ignores any tag that is not a genuine semver release
+/// (see [_normalizeVersion]), so the "update available" banner only ever
+/// appears for real semver releases published by the maintainer. Do not
+/// change this behavior.
 class UpdateCheckerService {
   /// GitHub repository (`owner/name`) that hosts Jusoor's releases.
   /// Update here if the project is ever moved.
@@ -91,6 +101,8 @@ class UpdateCheckerService {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = _normalizeVersion(packageInfo.version);
 
+      final preferredAbi = await _readPreferredAbi();
+
       final response = await http
           .get(_latestReleaseUri, headers: _headers)
           .timeout(_requestTimeout);
@@ -109,6 +121,7 @@ class UpdateCheckerService {
       return evaluateUpdate(
         currentVersion: currentVersion,
         releasePayload: payload,
+        preferredAbi: preferredAbi,
       );
     } on TimeoutException {
       debugPrint('[UpdateChecker] Request timed out; assuming no update.');
@@ -118,6 +131,23 @@ class UpdateCheckerService {
       // platform channel for package_info, …) — fold to "no update".
       debugPrint('[UpdateChecker] Check failed: $e');
       return UpdateInfo.none();
+    }
+  }
+
+  /// Reads the device ABI list from the platform channel so the update
+  /// checker can pick the matching split-per-abi artifact.
+  ///
+  /// Returns `null` on any failure (channel missing, platform unsupported)
+  /// — the caller then falls back to the first APK asset it finds.
+  static Future<String?> _readPreferredAbi() async {
+    try {
+      const channel = MethodChannel('dev.flutter.org/overlay_permission');
+      final abis = await channel.invokeListMethod<String>('getSupportedAbis');
+      if (abis == null || abis.isEmpty) return null;
+      return abis.first;
+    } catch (e) {
+      debugPrint('[UpdateChecker] Could not read ABI: $e');
+      return null;
     }
   }
 
@@ -132,6 +162,7 @@ class UpdateCheckerService {
   static UpdateInfo evaluateUpdate({
     required String currentVersion,
     required Map<String, dynamic> releasePayload,
+    String? preferredAbi,
   }) {
     final rawTag = releasePayload['tag_name'] as String?;
     if (rawTag == null || rawTag.isEmpty) {
@@ -145,20 +176,27 @@ class UpdateCheckerService {
     final releaseUrl = (releasePayload['html_url'] as String?) ?? '';
     final body = releasePayload['body'] as String?;
 
-    // Find the .apk asset in the release (if any). The release
-    // workflow uploads exactly one .apk named `app-release.apk`,
-    // but we don't hardcode the name — we pick the first asset
-    // whose name ends with `.apk`.
+    // Find the APK asset for this device's ABI. The release workflow
+    // uploads three split-per-abi artifacts — `jusoor-arm64-v8a.apk`,
+    // `jusoor-armeabi-v7a.apk`, `jusoor-x86_64.apk` — so we match the
+    // device ABI when known and otherwise pick the first `.apk` asset.
     String? apkUrl;
     final assets = releasePayload['assets'];
     if (assets is List) {
+      // Normalize the preferred ABI to the artifact naming: the platform
+      // reports e.g. `arm64-v8a`, matching `jusoor-arm64-v8a.apk`.
+      final abiSuffix = preferredAbi == null ? null : 'jusoor-$preferredAbi.apk';
       for (final raw in assets) {
         if (raw is! Map) continue;
         final name = raw['name'] as String? ?? '';
-        if (name.toLowerCase().endsWith('.apk')) {
+        final lower = name.toLowerCase();
+        if (!lower.endsWith('.apk')) continue;
+        // Prefer an exact ABI match when one is advertised.
+        if (abiSuffix != null && lower.endsWith(abiSuffix)) {
           apkUrl = raw['browser_download_url'] as String?;
           break;
         }
+        apkUrl ??= raw['browser_download_url'] as String?;
       }
     }
 
