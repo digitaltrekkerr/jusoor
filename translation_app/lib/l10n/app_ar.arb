@@ -107,6 +107,11 @@
     "description": "تسمية زر الترجمة الرئيسي."
   },
 
+  "historyAutoDetected": "تلقائي",
+  "@historyAutoDetected": {
+    "description": "تسمية شريحة توضح أن لغة المصدر حُدّدت تلقائيًا، تظهر في رأس تفاصيل الترجمة."
+  },
+
   "homeClearButton": "مسح",
   "@homeClearButton": {
     "description": "تسمية زر مسح الإدخال."
@@ -181,6 +186,11 @@
   "homeErrorFileBytes": "تعذّر قراءة بيانات الملف.",
   "@homeErrorFileBytes": {
     "description": "رسالة SnackBar عند عدم احتواء الملف المختار على بيانات مقروءة."
+  },
+
+  "shareFileTooLarge": "هذا الملف كبير جدًا على الفتح (أكثر من 50 ميجابايت). اختر ملفًا أصغر.",
+  "@shareFileTooLarge": {
+    "description": "رسالة SnackBar عند تجاوز ملف مشارك أو مستورد لحد 50 ميجابايت."
   },
 
   "homeFileWillBeChunked": "سيتم ترجمة الملف على دفعات",
@@ -384,6 +394,31 @@
   "settingsArticlesSubtitle": "أدلة سريعة وشروحات",
   "@settingsArticlesSubtitle": {
     "description": "وصف فرعي تحت tile 'مقالات' في الإعدادات → المساعدة والدعم، يوضح محتوى الصفحة."
+  },
+
+  "settingsTips": "نصائح",
+  "@settingsTips": {
+    "description": "عنوان صفحة النصائح و tile الذي يفتحها من الإعدادات → المساعدة والدعم."
+  },
+
+  "settingsTipsSubtitle": "نصائح سريعة وأدلة خطوة بخطوة",
+  "@settingsTipsSubtitle": {
+    "description": "وصف فرعي تحت tile 'نصائح' في الإعدادات → المساعدة والدعم."
+  },
+
+  "tipsQuickTipsHeader": "نصائح سريعة",
+  "@tipsQuickTipsHeader": {
+    "description": "عنوان القسم الأعلى في صفحة النصائح الذي يعرض نصائح عملية."
+  },
+
+  "tipsUsageHeader": "كيفية استخدام التطبيق",
+  "@tipsUsageHeader": {
+    "description": "عنوان قسم في صفحة النصائح يعرض خطوات الاستخدام."
+  },
+
+  "tipsSetupHeader": "الإعداد خطوة بخطوة",
+  "@tipsSetupHeader": {
+    "description": "عنوان قسم في صفحة النصائح يربط بمقالات الإعداد."
   },
 
   "articleLoadError": "تعذّر تحميل المقال.",
@@ -748,6 +783,16 @@
     }
   },
 
+  "tplOutLangFixedTitle": "لغة إخراج ثابتة (بدون متغيّر)",
+  "@tplOutLangFixedTitle": {
+    "description": "عنوان مفتاح تفعيل لغة الإخراج الثابتة للقالب."
+  },
+
+  "tplOutLangFixedSubtitle": "هذا القالب يعمل بدون متغيّر اللغة المستهدفة — سيُخفى اختيار اللغة في الصفحة الرئيسية، ولن يُعيَّن للأوفّرلاي.",
+  "@tplOutLangFixedSubtitle": {
+    "description": "وصف مفتاح تفعيل لغة الإخراج الثابتة للقالب."
+  },
+
   "tplEditSaveButton": "حفظ",
   "@tplEditSaveButton": {
     "description": "تسمية زر الحفظ العائم في محرر القوالب."
@@ -812,5 +857,509 @@
         "example": "0.1.6"
       }
     }
+  },
+
+  "copyAsPlain": "نسخ كنص عادي",
+  "@copyAsPlain": {
+    "description": "خيار في ورقة النسخ السفلية ينسخ الترجمة بعد تجريدها من تنسيق Markdown."
+  },
+
+  "copyAsMarkdown": "نسخ كـ Markdown",
+  "@copyAsMarkdown": {
+    "description": "خيار في ورقة النسخ السفلية ينسخ الترجمة بتنسيق Markdown الخام."
+  },
+
+  "shareAsPlain": "مشاركة كنص عادي",
+  "@shareAsPlain": {
+    "description": "خيار في ورقة المشاركة السفلية يشارك الترجمة بعد تجريدها من تنسيق Markdown."
+  },
+
+  "shareAsMarkdown": "مشاركة كـ Markdown (.md)",
+  "@shareAsMarkdown": {
+    "description": "خيار في ورقة المشاركة السفلية يشارك الترجمة كملف .md (السلوك الحالي)."
+  },
+
+  "saveToFile": "حفظ إلى ملف",
+  "@saveToFile": {
+    "description": "خيار في ورقة المشاركة السفلية يسمح للمستخدم بحفظ الترجمة كملف عبر ورقة مشاركة النظام."
+  },
+
+  "copyOptionsTitle": "خيارات النسخ",
+  "@copyOptionsTitle": {
+    "description": "عنوان الورقة السفلية التي تظهر عند الضغط المطوّل على زر النسخ لاختيار نص عادي أو Markdown."
+  },
+
+  "shareOptionsTitle": "خيارات المشاركة",
+  "@shareOptionsTitle": {
+    "description": "Title of the bottom sheet shown when the share button is tapped, letting the user pick plain, Markdown, or save-to-file."
+  },
+
+  "sheetPlainSubtitle": "بدون تنسيق Markdown",
+  "@sheetPlainSubtitle": {
+    "description": "وصف فرعي تحت خياري النسخ/المشاركة كنص عادي في الورقتين السفليتين."
+  },
+
+  "sheetMarkdownFileSubtitle": "ملف نصي بالتنسيق الأصلي",
+  "@sheetMarkdownFileSubtitle": {
+    "description": "وصف فرعي تحت خيار المشاركة كملف Markdown في ورقة المشاركة السفلية."
+  },
+
+  "sheetCopyMarkdownSubtitle": "مع التنسيق الأصلي",
+  "@sheetCopyMarkdownSubtitle": {
+    "description": "وصف فرعي تحت خيار النسخ كـ Markdown في ورقة النسخ السفلية."
+  },
+
+  "sheetSaveToFileSubtitle": "اختر مكان الحفظ من ورقة المشاركة",
+  "@sheetSaveToFileSubtitle": {
+    "description": "وصف فرعي تحت خيار الحفظ إلى ملف في ورقة المشاركة السفلية."
+  },
+
+  "commonName": "الاسم",
+  "@commonName": {
+    "description": "تسمية عامة لحقل الاسم."
+  },
+
+  "commonDelete": "حذف",
+  "@commonDelete": {
+    "description": "تسمية زر الحذف العامة."
+  },
+
+  "commonEdit": "تعديل",
+  "@commonEdit": {
+    "description": "تسمية/تلميح التعديل العام."
+  },
+
+  "commonSave": "حفظ",
+  "@commonSave": {
+    "description": "تسمية زر الحفظ العامة."
+  },
+
+  "badgeBuiltIn": "مضمّن",
+  "@badgeBuiltIn": {
+    "description": "شارة صغيرة تظهر على القوالب وملفات الموفّر المضمّنة."
+  },
+
+  "badgeText": "نص",
+  "@badgeText": {
+    "description": "شارة صغيرة لإمكانية ترجمة النصوص."
+  },
+
+  "badgeImage": "صورة",
+  "@badgeImage": {
+    "description": "شارة صغيرة لإمكانية ترجمة الصور."
+  },
+
+  "apiKeysTitle": "مفاتيح API",
+  "@apiKeysTitle": {
+    "description": "عنوان شاشة مفاتيح API و AppBar الخاص بها."
+  },
+
+  "apiKeysAddTooltip": "إضافة مفتاح API",
+  "@apiKeysAddTooltip": {
+    "description": "تلميح زر AppBar الذي يفتح حوار إضافة مفتاح API."
+  },
+
+  "apiKeysEmptyState": "لا توجد مفاتيح API بعد. اضغط + لإضافة مفتاح.",
+  "@apiKeysEmptyState": {
+    "description": "رسالة الحالة الفارغة عندما لا يملك المستخدم أي مفاتيح API."
+  },
+
+  "apiKeysAddNewButton": "إضافة مفتاح جديد",
+  "@apiKeysAddNewButton": {
+    "description": "زر رئيسي في نهاية القائمة لإضافة مفتاح API جديد."
+  },
+
+  "apiKeysAddTitle": "إضافة مفتاح API",
+  "@apiKeysAddTitle": {
+    "description": "عنوان حوار إنشاء مفتاح API."
+  },
+
+  "apiKeysEditTitle": "تعديل مفتاح API",
+  "@apiKeysEditTitle": {
+    "description": "عنوان حوار تعديل مفتاح API."
+  },
+
+  "apiKeysNameHint": "مثال: OpenRouter أو Gemini",
+  "@apiKeysNameHint": {
+    "description": "نص تلميح حقل اسم مفتاح API."
+  },
+
+  "apiKeysNameRequired": "الاسم مطلوب",
+  "@apiKeysNameRequired": {
+    "description": "رسالة تحقق عند كون اسم مفتاح API فارغًا."
+  },
+
+  "apiKeysValueLabel": "قيمة مفتاح API",
+  "@apiKeysValueLabel": {
+    "description": "تسمية حقل قيمة مفتاح API."
+  },
+
+  "apiKeysValueRequired": "قيمة مفتاح API مطلوبة",
+  "@apiKeysValueRequired": {
+    "description": "رسالة تحقق عند كون قيمة مفتاح API فارغة."
+  },
+
+  "apiKeysSaveFailed": "فشل حفظ مفتاح API: {error}",
+  "@apiKeysSaveFailed": {
+    "description": "رسالة SnackBar عند فشل حفظ مفتاح API؛ يُلحق بها تفصيل الخطأ التقني.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "التخزين الآمن غير متاح"
+      }
+    }
+  },
+
+  "apiKeysDeleteTitle": "حذف مفتاح API؟",
+  "@apiKeysDeleteTitle": {
+    "description": "عنوان حوار تأكيد حذف مفتاح API."
+  },
+
+  "apiKeysDeleteBody": "هل أنت متأكد من حذف \"{name}\"؟ لا يمكن التراجع عن هذا.\n\nستتم إزالة مرجع مفتاح API من ملفات الموفّر التي تستخدمه.",
+  "@apiKeysDeleteBody": {
+    "description": "نص حوار تأكيد حذف مفتاح API.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "OpenRouter"
+      }
+    }
+  },
+
+  "apiKeysEmptyValue": "(فارغ)",
+  "@apiKeysEmptyValue": {
+    "description": "نص مؤقت يظهر عندما لا يملك مفتاح API قيمة مخزنة."
+  },
+
+  "historySearchHint": "البحث في الترجمات...",
+  "@historySearchHint": {
+    "description": "نص تلميح شريط البحث في شاشة السجل."
+  },
+
+  "historyClearAllTooltip": "مسح السجل بالكامل",
+  "@historyClearAllTooltip": {
+    "description": "تلميح زر مسح السجل بالكامل في AppBar."
+  },
+
+  "historyDeletedSnackbar": "تم حذف الترجمة",
+  "@historyDeletedSnackbar": {
+    "description": "رسالة SnackBar بعد حذف سجل ترجمة."
+  },
+
+  "historyUndoAction": "تراجع",
+  "@historyUndoAction": {
+    "description": "تسمية إجراء التراجع في SnackBar الحذف."
+  },
+
+  "historyClearAllTitle": "مسح السجل بالكامل",
+  "@historyClearAllTitle": {
+    "description": "عنوان حوار تأكيد مسح السجل بالكامل."
+  },
+
+  "historyClearAllBody": "سيؤدي هذا إلى حذف كل سجل الترجمة نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+  "@historyClearAllBody": {
+    "description": "نص حوار تأكيد مسح السجل بالكامل."
+  },
+
+  "historyClearAllButton": "مسح الكل",
+  "@historyClearAllButton": {
+    "description": "زر التأكيد في حوار مسح السجل بالكامل."
+  },
+
+  "historyNoResults": "لا توجد نتائج لـ '{query}'",
+  "@historyNoResults": {
+    "description": "رسالة البحث الفارغ؛ يُعزل الاستعلام بين LRI/PDI في موقع الاستدعاء للحفاظ على ترتيب الاستعلامات متعددة الاتجاهات.",
+    "placeholders": {
+      "query": {
+        "type": "String",
+        "example": "مرحبا"
+      }
+    }
+  },
+
+  "historyEmptyState": "لا يوجد سجل ترجمة بعد",
+  "@historyEmptyState": {
+    "description": "رسالة الحالة الفارغة عندما لا يوجد سجل ترجمة."
+  },
+
+  "historyLoadFailed": "تعذّر تحميل السجل",
+  "@historyLoadFailed": {
+    "description": "عنوان حالة الخطأ عند فشل تحميل قائمة السجل."
+  },
+
+  "historyToday": "اليوم",
+  "@historyToday": {
+    "description": "تسمية التاريخ لسجل ترجم اليوم."
+  },
+
+  "historyYesterday": "أمس",
+  "@historyYesterday": {
+    "description": "تسمية التاريخ لسجل ترجم أمس."
+  },
+
+  "historyDaysAgo": "{count, plural, zero{منذ 0 يوم} one{منذ يوم واحد} two{منذ يومين} few{منذ {count} أيام} many{منذ {count} يومًا} other{منذ {count} يوم}}",
+  "@historyDaysAgo": {
+    "description": "تسمية التاريخ لسجل أقدم من أمس.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+
+  "historyDetailTitle": "تفاصيل الترجمة",
+  "@historyDetailTitle": {
+    "description": "عنوان AppBar لشاشة تفاصيل الترجمة."
+  },
+
+  "historyInputLabel": "النص المُدخل",
+  "@historyInputLabel": {
+    "description": "تسمية القسم فوق النص الأصلي المُدخل في شاشة تفاصيل الترجمة."
+  },
+
+  "historyOutputLabel": "الترجمة الناتجة",
+  "@historyOutputLabel": {
+    "description": "تسمية القسم فوق الترجمة الناتجة في شاشة تفاصيل الترجمة."
+  },
+
+  "templatesAddTooltip": "إضافة قالب",
+  "@templatesAddTooltip": {
+    "description": "تلميح زر AppBar الذي يفتح محرر القوالب لقالب جديد."
+  },
+
+  "templatesEmptyState": "لا توجد قوالب بعد. اضغط + لإضافة قالب.",
+  "@templatesEmptyState": {
+    "description": "رسالة الحالة الفارغة عندما لا يملك المستخدم أي قوالب."
+  },
+
+  "templatesUnknownProfile": "ملف موفّر غير معروف",
+  "@templatesUnknownProfile": {
+    "description": "عنوان مجموعة في قائمة القوالب للقوالب التي لم يعد ملف موفّرها موجودًا."
+  },
+
+  "templatesDeleteTitle": "حذف القالب؟",
+  "@templatesDeleteTitle": {
+    "description": "عنوان حوار تأكيد حذف القالب."
+  },
+
+  "templatesDeleteBody": "هل أنت متأكد من حذف \"{name}\"؟ لا يمكن التراجع عن هذا.",
+  "@templatesDeleteBody": {
+    "description": "نص حوار تأكيد حذف القالب.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "مترجم محترف"
+      }
+    }
+  },
+
+  "templatesBuiltInWarning": "هذا قالب مضمّن. يمكنك استعادته من الإعدادات بالضغط على \"استعادة العناصر المضمّنة\".",
+  "@templatesBuiltInWarning": {
+    "description": "تحذير يظهر في حوار حذف القالب للقوالب المضمّنة."
+  },
+
+  "profilesAddTooltip": "إضافة ملف موفّر",
+  "@profilesAddTooltip": {
+    "description": "تلميح زر AppBar الذي يفتح محرر الملفات لملف جديد."
+  },
+
+  "profilesEmptyState": "لا توجد ملفات موفّر بعد. اضغط + لإضافة ملف.",
+  "@profilesEmptyState": {
+    "description": "رسالة الحالة الفارغة عندما لا يملك المستخدم أي ملفات موفّر."
+  },
+
+  "profilesDeleteTitle": "حذف ملف الموفّر؟",
+  "@profilesDeleteTitle": {
+    "description": "عنوان حوار تأكيد حذف ملف الموفّر."
+  },
+
+  "profilesDeleteBody": "هل أنت متأكد من حذف \"{name}\"؟ لا يمكن التراجع عن هذا.",
+  "@profilesDeleteBody": {
+    "description": "نص حوار تأكيد حذف ملف الموفّر.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "ملف OpenRouter الخاص بي"
+      }
+    }
+  },
+
+  "profilesBuiltInWarning": "هذا ملف موفّر مضمّن. يمكنك استعادته من الإعدادات بالضغط على \"استعادة العناصر المضمّنة\".",
+  "@profilesBuiltInWarning": {
+    "description": "تحذير يظهر في حوار حذف الملف لملفات الموفّر المضمّنة."
+  },
+
+  "profilesModelLabel": "النموذج: {model}",
+  "@profilesModelLabel": {
+    "description": "سطر النموذج في بطاقة ملف الموفّر.",
+    "placeholders": {
+      "model": {
+        "type": "String",
+        "example": "gpt-4o"
+      }
+    }
+  },
+
+  "profilesApiKeyLabel": "مفتاح API: {name}",
+  "@profilesApiKeyLabel": {
+    "description": "سطر مفتاح API في بطاقة ملف الموفّر.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "OpenRouter"
+      }
+    }
+  },
+
+  "profileEditTitle": "تعديل ملف الموفّر",
+  "@profileEditTitle": {
+    "description": "عنوان AppBar لمحرر الملفات عند تعديل ملف موجود."
+  },
+
+  "profileNewTitle": "ملف موفّر جديد",
+  "@profileNewTitle": {
+    "description": "عنوان AppBar لمحرر الملفات عند إنشاء ملف جديد."
+  },
+
+  "profileNameHint": "مثال: ملف OpenRouter الخاص بي",
+  "@profileNameHint": {
+    "description": "نص تلميح حقل اسم ملف الموفّر."
+  },
+
+  "profileProviderTypeLabel": "نوع الموفّر",
+  "@profileProviderTypeLabel": {
+    "description": "تسمية قسم محدد نوع الموفّر."
+  },
+
+  "profileModelLabel": "النموذج",
+  "@profileModelLabel": {
+    "description": "تسمية حقل اختيار النموذج."
+  },
+
+  "profileVisionModelLabel": "نموذج الرؤية (اختياري)",
+  "@profileVisionModelLabel": {
+    "description": "تسمية حقل اختيار نموذج الرؤية."
+  },
+
+  "profileSelectModelHint": "اختر نموذجًا",
+  "@profileSelectModelHint": {
+    "description": "نص مؤقت في حقل النموذج عندما لا يوجد نموذج مختار."
+  },
+
+  "profileSelectApiKeyFirstHint": "اختر مفتاح API أولًا",
+  "@profileSelectApiKeyFirstHint": {
+    "description": "نص مؤقت في حقلي النموذج عندما لا يوجد مفتاح API مختار."
+  },
+
+  "profileVisionModelPlaceholder": "لترجمة الصور",
+  "@profileVisionModelPlaceholder": {
+    "description": "نص مؤقت في حقل نموذج الرؤية عندما لا يوجد نموذج مختار."
+  },
+
+  "profileApiKeyLabel": "مفتاح API",
+  "@profileApiKeyLabel": {
+    "description": "تسمية حقل اختيار مفتاح API."
+  },
+
+  "profileFallbackApiKeyLabel": "مفتاح API احتياطي (اختياري)",
+  "@profileFallbackApiKeyLabel": {
+    "description": "تسمية حقل اختيار مفتاح API الاحتياطي."
+  },
+
+  "profileSelectModelTitle": "اختر النموذج",
+  "@profileSelectModelTitle": {
+    "description": "عنوان الورقة السفلية لاختيار النموذج."
+  },
+
+  "profileSelectVisionModelTitle": "اختر نموذج الرؤية",
+  "@profileSelectVisionModelTitle": {
+    "description": "عنوان الورقة السفلية لاختيار نموذج الرؤية."
+  },
+
+  "profileSelectApiKeyTitle": "اختر مفتاح API",
+  "@profileSelectApiKeyTitle": {
+    "description": "عنوان الورقة السفلية لاختيار مفتاح API."
+  },
+
+  "profileSelectFallbackApiKeyTitle": "اختر مفتاح API الاحتياطي",
+  "@profileSelectFallbackApiKeyTitle": {
+    "description": "عنوان الورقة السفلية لاختيار مفتاح API الاحتياطي."
+  },
+
+  "profileSearchModelsHint": "البحث عن نماذج...",
+  "@profileSearchModelsHint": {
+    "description": "نص تلميح البحث في الورقة السفلية لاختيار النماذج."
+  },
+
+  "profileRefreshModelsTooltip": "تحديث النماذج",
+  "@profileRefreshModelsTooltip": {
+    "description": "تلميح زر تحديث النماذج."
+  },
+
+  "profileLoadModelsFailed": "فشل تحميل النماذج: {error}",
+  "@profileLoadModelsFailed": {
+    "description": "رسالة SnackBar عند فشل جلب قائمة النماذج؛ يُلحق بها تفصيل الخطأ التقني.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "تعذّر الاتصال"
+      }
+    }
+  },
+
+  "profileNameRequired": "اسم ملف الموفّر مطلوب.",
+  "@profileNameRequired": {
+    "description": "رسالة SnackBar عند حفظ ملف موفّر بدون اسم."
+  },
+
+  "profileModelRequired": "يجب اختيار نموذج.",
+  "@profileModelRequired": {
+    "description": "رسالة SnackBar عند حفظ ملف موفّر بدون اختيار نموذج."
+  },
+
+  "profileBaseUrlInvalid": "أدخل رابطًا صالحًا يبدأ بـ http:// أو https://.",
+  "@profileBaseUrlInvalid": {
+    "description": "Validation error when the Base URL has no valid scheme."
+  },
+
+  "profileBaseUrlHttpsRequired": "عناوين http:// غير مسموحة للخواديم البعيدة. استخدم https:// (يُسمح بـ http فقط لـ localhost/127.0.0.1).",
+  "@profileBaseUrlHttpsRequired": {
+    "description": "Validation error when a remote Base URL uses plain http instead of https."
+  },
+
+  "profileBaseUrlHttpsHint": "أدخل رابطًا صالحًا يبدأ بـ https:// (أو http://localhost للنماذج المحلية).",
+  "@profileBaseUrlHttpsHint": {
+    "description": "Validation error when the Base URL cannot be parsed as a URL."
+  },
+
+  "profileOpenAiSettingsTitle": "إعدادات متوافقة مع OpenAI",
+  "@profileOpenAiSettingsTitle": {
+    "description": "عنوان قسم إعدادات الموفّرات المتوافقة مع OpenAI."
+  },
+
+  "profileBaseUrlLabel": "رابط الأساس (Base URL)",
+  "@profileBaseUrlLabel": {
+    "description": "تسمية حقل رابط الأساس للموفّرات المتوافقة مع OpenAI."
+  },
+
+  "profileModelAccessTitle": "يلزم تحديد مفتاح API أولًا",
+  "@profileModelAccessTitle": {
+    "description": "عنوان الورقة السفلية عند الضغط على حقل النموذج دون اختيار مفتاح API."
+  },
+
+  "profileModelAccessBody": "اختر مفتاحًا موجودًا من قائمتك، أو أضف مفتاحًا جديدًا للبدء بجلب النماذج.",
+  "@profileModelAccessBody": {
+    "description": "نص الورقة السفلية للوصول إلى النماذج."
+  },
+
+  "profileModelAccessPickExisting": "اختر مفتاحًا موجودًا",
+  "@profileModelAccessPickExisting": {
+    "description": "خيار يفتح أداة اختيار مفتاح API."
+  },
+
+  "profileModelAccessAddNew": "إضافة مفتاح جديد",
+  "@profileModelAccessAddNew": {
+    "description": "خيار يفتح شاشة مفاتيح API لإضافة مفتاح جديد."
   }
 }

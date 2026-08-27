@@ -54,7 +54,9 @@ const val ACTION_OVERLAY_CLOSED = "com.digitaltrekkerr.jusoor.OVERLAY_CLOSED"
 const val ACTION_STOP_SERVICE = "com.digitaltrekkerr.jusoor.STOP_SERVICE"
 
 @SuppressLint("Wakelock")
-class TranslationOverlayService : Service(), View.OnTouchListener {
+class TranslationOverlayService :
+    Service(),
+    View.OnTouchListener {
     companion object {
         private const val TAG = "TranslationOverlay"
         private const val CHANNEL_ID = "TranslationOverlayChannel"
@@ -62,6 +64,80 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         private const val CACHED_TAG = "translationOverlayEngine"
         private const val SCREENSHOT_CHANNEL = "dev.flutter.org/screenshot"
         private const val PROJECTION_RESULT_ACTION = "com.digitaltrekkerr.jusoor.PROJECTION_RESULT"
+
+        /**
+         * Removes Markdown formatting so the clipboard receives a plain-text
+         * rendering. This is a faithful port of the Dart canonical helper
+         * `toPlainText` in
+         * `packages/markdown_renderer/lib/src/utils/markdown_stripper.dart`
+         * (which wraps the `strip_markdown` package's `removeMd` with default
+         * options): the same ordered regex pipeline, an extra `*`-emphasis
+         * pass for nested constructs, and a final whitespace collapse + trim.
+         *
+         * Because the output mirrors the Dart side exactly, re-stripping text
+         * that Dart already converted is a no-op (idempotent double-strip):
+         * fenced code content is preserved (never replaced by a space),
+         * inline backticks are resolved the same way, and nested emphasis
+         * collapses identically.
+         *
+         * Keep this in sync with `toPlainText` if either side is extended.
+         */
+        internal fun stripMarkdownForClipboard(input: String): String {
+            if (input.isEmpty()) return input
+
+            var s = input
+
+            // --- Mirrors removeMd (strip_markdown 1.1.0, default options). ---
+            // Horizontal rules (must run before list leaders).
+            s = s.replace(Regex("^ {0,3}((?:-[\\t ]*){3,}|(?:_[ \\t]*){3,}|(?:\\*[ \\t]*){3,})(?:\\n+|$)", RegexOption.MULTILINE), "")
+            // List leaders (-, *, +, 1.) — keep the leading indentation only.
+            s = s.replace(Regex("^([\\s\\t]*)([\\*\\-\\+]|\\d+\\.)\\s+", RegexOption.MULTILINE)) { m -> m.groupValues[1] }
+            // GFM: setext header underline, tilde fences, strikethrough, backtick fences.
+            s = s.replace(Regex("\\n={2,}"), "\n")
+            s = s.replace(Regex("~{3}.*\\n"), "")
+            s = s.replace(Regex("~~"), "")
+            s = s.replace(Regex("```(?:.*)\\n([\\s\\S]*?)```")) { m -> m.groupValues[1].trim() }
+            // HTML tags.
+            s = s.replace(Regex("<[^>]*>"), "")
+            // Setext-style headers.
+            s = s.replace(Regex("^[=\\-]{2,}\\s*$", RegexOption.MULTILINE), "")
+            // Footnote markers and reference definitions.
+            s = s.replace(Regex("\\[\\^.+?\\](\\: .*?$)?", RegexOption.MULTILINE), "")
+            s = s.replace(Regex("\\s{0,2}\\[.*?\\]: .*?$", RegexOption.MULTILINE), "")
+            // Images → keep the alt text (matches Dart's useImgAltText=true).
+            s = s.replace(Regex("!\\[(.*?)\\][\\[\\(].*?[\\]\\)]")) { m -> m.groupValues[1] }
+            // Inline links → keep the link text.
+            s = s.replace(Regex("\\[([^\\]]*?)\\][\\[\\(].*?[\\]\\)]")) { m -> m.groupValues[1] }
+            // Blockquotes.
+            s = s.replace(Regex("^(\\n)?\\s{0,3}>\\s?", RegexOption.MULTILINE)) { m -> m.groupValues[1] }
+            // Reference-style links.
+            s = s.replace(Regex("^\\s{1,2}\\[(.*?)\\]: (\\S+)( \".*?\")?\\s*$", RegexOption.MULTILINE), "")
+            // Atx-style headers — keep any leading newline and the heading text.
+            s = s.replace(Regex("^(\\n)?\\s{0,}#{1,6}\\s*( (.+))? +#+$|^(\\n)?\\s{0,}#{1,6}\\s*( (.+))?$", RegexOption.MULTILINE)) { m ->
+                m.groupValues[1] + m.groupValues[3] + m.groupValues[4] + m.groupValues[6]
+            }
+            // * emphasis (**bold**, *italic*, ***both***, nested runs).
+            s = s.replace(Regex("([\\*]+)(\\S)(.*?\\S)??\\1")) { m -> m.groupValues[2] + m.groupValues[3] }
+            // _ emphasis (_italic_ outside words, __bold__).
+            s = s.replace(Regex("(^|\\W)([_]+)(\\S)(.*?\\S)??\\2($|\\W)")) { m ->
+                m.groupValues[1] + m.groupValues[3] + m.groupValues[4] + m.groupValues[5]
+            }
+            // Multiline backtick blocks (3+ backticks) and inline code.
+            s = s.replace(Regex("(`{3,})(.*?)\\1", RegexOption.MULTILINE)) { m -> m.groupValues[2] }
+            s = s.replace(Regex("`(.+?)`")) { m -> m.groupValues[1] }
+            // Strikethrough (single tilde).
+            s = s.replace(Regex("~(.*?)~")) { m -> m.groupValues[1] }
+
+            // --- Extra *-emphasis pass (mirrors toPlainText): nested
+            // constructs such as `**bold *italic* text**` only fully resolve
+            // when the same rule is applied again. ---
+            s = s.replace(Regex("([\\*]+)(\\S)(.*?\\S)??\\1")) { m -> m.groupValues[2] + m.groupValues[3] }
+
+            // Collapse whitespace runs (incl. unicode spaces — the Dart `\s`
+            // character class) to a single space, then trim.
+            return s.replace(Regex("[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+"), " ").trim()
+        }
+
         private const val ACTION_CLIPBOARD_RESULT = "com.digitaltrekkerr.jusoor.CLIPBOARD_RESULT"
         private const val DEFAULT_NAV_BAR_HEIGHT_DP = 48
         private const val DEFAULT_STATUS_BAR_HEIGHT_DP = 25
@@ -109,16 +185,22 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     private var captureThread: HandlerThread? = null
     private var captureHandler: Handler? = null
 
-    private val windowFocusListener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
-        Log.d(TAG, "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard")
-        if (!hasFocus && !isHidden && hasWindowFocus && !isRequestingMediaProjection && !isScreenshotInProgress && !isReadingClipboard) {
-            Log.d(TAG, "Lost focus while not hidden - closing overlay")
-            hasWindowFocus = false
-            closeOverlay()
-        } else if (hasFocus) {
-            hasWindowFocus = true
+    private val windowFocusListener =
+        ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+            Log.d(
+                TAG,
+                "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard",
+            )
+            if (!hasFocus && !isHidden && hasWindowFocus && !isRequestingMediaProjection && !isScreenshotInProgress &&
+                !isReadingClipboard
+            ) {
+                Log.d(TAG, "Lost focus while not hidden - closing overlay")
+                hasWindowFocus = false
+                closeOverlay()
+            } else if (hasFocus) {
+                hasWindowFocus = true
+            }
         }
-    }
 
     @Nullable
     override fun onBind(intent: Intent?): IBinder? = null
@@ -135,10 +217,14 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         if (engine == null) {
             Log.e(TAG, "Flutter engine not found, creating new one")
             val engineGroup = FlutterEngineGroup(this)
-            val entryPoint = DartExecutor.DartEntrypoint(
-                io.flutter.FlutterInjector.instance().flutterLoader().findAppBundlePath(),
-                "overlayMain"
-            )
+            val entryPoint =
+                DartExecutor.DartEntrypoint(
+                    io.flutter.FlutterInjector
+                        .instance()
+                        .flutterLoader()
+                        .findAppBundlePath(),
+                    "overlayMain",
+                )
             engine = engineGroup.createAndRunEngine(this, entryPoint)
             FlutterEngineCache.getInstance().put(CACHED_TAG, engine)
         }
@@ -165,7 +251,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     private fun safeRegisterReceiver(
         receiver: BroadcastReceiver?,
         filter: IntentFilter?,
-        exportBehavior: Int
+        exportBehavior: Int,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, filter, exportBehavior)
@@ -177,18 +263,22 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     private fun registerReceivers() {
         try {
             val dialogFilter = IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            systemDialogReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS == intent?.action) {
-                        if (isRequestingMediaProjection || isScreenshotInProgress) {
-                            Log.d(TAG, "System dialog closing - ignored (screenshot/projection in progress)")
-                            return
+            systemDialogReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(
+                        context: Context?,
+                        intent: Intent?,
+                    ) {
+                        if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS == intent?.action) {
+                            if (isRequestingMediaProjection || isScreenshotInProgress) {
+                                Log.d(TAG, "System dialog closing - ignored (screenshot/projection in progress)")
+                                return
+                            }
+                            Log.d(TAG, "System dialog closing - Home/Recents pressed, closing overlay")
+                            closeOverlay()
                         }
-                        Log.d(TAG, "System dialog closing - Home/Recents pressed, closing overlay")
-                        closeOverlay()
                     }
                 }
-            }
             // ACTION_CLOSE_SYSTEM_DIALOGS is a system broadcast — the system
             // delivers it even to NOT_EXPORTED receivers, and no third-party
             // app needs to trigger this receiver directly.
@@ -200,14 +290,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
         try {
             val stopFilter = IntentFilter(ACTION_STOP_SERVICE)
-            stopServiceReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (ACTION_STOP_SERVICE == intent?.action) {
-                        Log.d(TAG, "Stop service requested")
-                        stopServiceCompletely()
+            stopServiceReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(
+                        context: Context?,
+                        intent: Intent?,
+                    ) {
+                        if (ACTION_STOP_SERVICE == intent?.action) {
+                            Log.d(TAG, "Stop service requested")
+                            stopServiceCompletely()
+                        }
                     }
                 }
-            }
             safeRegisterReceiver(stopServiceReceiver, stopFilter, RECEIVER_NOT_EXPORTED)
             Log.d(TAG, "Registered stop service receiver")
         } catch (e: Exception) {
@@ -216,20 +310,25 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
         try {
             val projectionFilter = IntentFilter(PROJECTION_RESULT_ACTION)
-            projectionResultReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (PROJECTION_RESULT_ACTION == intent?.action) {
-                        val resultCode = intent.getIntExtra("resultCode", 0)
-                        val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            intent.getParcelableExtra("data", Intent::class.java)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            intent.getParcelableExtra<Intent>("data")
+            projectionResultReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(
+                        context: Context?,
+                        intent: Intent?,
+                    ) {
+                        if (PROJECTION_RESULT_ACTION == intent?.action) {
+                            val resultCode = intent.getIntExtra("resultCode", 0)
+                            val data =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    intent.getParcelableExtra("data", Intent::class.java)
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    intent.getParcelableExtra<Intent>("data")
+                                }
+                            onProjectionResult(resultCode, data)
                         }
-                        onProjectionResult(resultCode, data)
                     }
                 }
-            }
             safeRegisterReceiver(projectionResultReceiver, projectionFilter, RECEIVER_NOT_EXPORTED)
             Log.d(TAG, "Registered projection result receiver")
         } catch (e: Exception) {
@@ -238,24 +337,30 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
         try {
             val clipboardFilter = IntentFilter(ACTION_CLIPBOARD_RESULT)
-            clipboardResultReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (ACTION_CLIPBOARD_RESULT == intent?.action) {
-                        val text = intent.getStringExtra("text") ?: ""
-                        if (BuildConfig.DEBUG) {
-                            Log.d("ClipboardDebug", "served via: relay, ${text.length} chars")
+            clipboardResultReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(
+                        context: Context?,
+                        intent: Intent?,
+                    ) {
+                        if (ACTION_CLIPBOARD_RESULT == intent?.action) {
+                            val text = intent.getStringExtra("text") ?: ""
+                            if (BuildConfig.DEBUG) {
+                                Log.d("ClipboardDebug", "served via: relay, ${text.length} chars")
+                            }
+                            pendingClipboardResult?.success(
+                                mapOf(
+                                    "text" to text,
+                                    "source" to "relay",
+                                    "timestamp" to System.currentTimeMillis(),
+                                    "stale" to false,
+                                ),
+                            )
+                            pendingClipboardResult = null
+                            isReadingClipboard = false
                         }
-                        pendingClipboardResult?.success(mapOf(
-                            "text" to text,
-                            "source" to "relay",
-                            "timestamp" to System.currentTimeMillis(),
-                            "stale" to false
-                        ))
-                        pendingClipboardResult = null
-                        isReadingClipboard = false
                     }
                 }
-            }
             safeRegisterReceiver(clipboardResultReceiver, clipboardFilter, RECEIVER_NOT_EXPORTED)
             Log.d(TAG, "Registered clipboard result receiver")
         } catch (e: Exception) {
@@ -306,13 +411,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     }
 
     @Suppress("DEPRECATION")
-    private fun startForegroundCompat(notificationId: Int, notification: Notification) {
+    private fun startForegroundCompat(
+        notificationId: Int,
+        notification: Notification,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 notificationId,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
             )
         } else {
             startForeground(notificationId, notification)
@@ -321,16 +429,17 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Translation Overlay",
-                NotificationManager.IMPORTANCE_MIN
-            ).apply {
-                setShowBadge(false)
-                enableLights(false)
-                enableVibration(false)
-                setSound(null, null)
-            }
+            val channel =
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "Translation Overlay",
+                    NotificationManager.IMPORTANCE_MIN,
+                ).apply {
+                    setShowBadge(false)
+                    enableLights(false)
+                    enableVibration(false)
+                    setSound(null, null)
+                }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
         }
@@ -338,14 +447,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
     private fun createNotification(): Notification {
         val mainIntent = Intent(this, MainActivity::class.java)
-        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val pendingFlags =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
         val mainPendingIntent = PendingIntent.getActivity(this, 0, mainIntent, pendingFlags)
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat
+            .Builder(this, CHANNEL_ID)
             .setContentTitle("Translator Overlay")
             .setContentText("Translation overlay is active")
             .setSmallIcon(R.drawable.ic_translate_tile)
@@ -355,7 +466,11 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         Log.d(TAG, "onStartCommand called")
 
         when {
@@ -363,6 +478,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                 stopServiceCompletely()
                 return START_NOT_STICKY
             }
+
             intent?.getBooleanExtra("close", false) == true -> {
                 closeOverlay()
                 if (!isScreenshotInProgress) {
@@ -370,6 +486,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                 }
                 return START_NOT_STICKY
             }
+
             intent?.getBooleanExtra("hide", false) == true -> {
                 hideOverlay()
                 return START_STICKY
@@ -405,7 +522,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         startActivity(intent)
     }
 
-    private fun onProjectionResult(resultCode: Int, data: Intent?) {
+    private fun onProjectionResult(
+        resultCode: Int,
+        data: Intent?,
+    ) {
         Log.d(TAG, "onProjectionResult: resultCode=$resultCode")
         isWaitingForProjection = false
         isRequestingMediaProjection = false
@@ -414,13 +534,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = manager.getMediaProjection(resultCode, data)
 
-            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
-                override fun onStop() {
-                    Log.d(TAG, "MediaProjection stopped")
-                    mediaProjection = null
-                    releaseVirtualDisplay()
-                }
-            }, null)
+            mediaProjection?.registerCallback(
+                object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        Log.d(TAG, "MediaProjection stopped")
+                        mediaProjection = null
+                        releaseVirtualDisplay()
+                    }
+                },
+                null,
+            )
 
             Log.i(TAG, "MediaProjection created successfully")
             performCapture()
@@ -507,14 +630,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
             imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
 
             val flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR
-            virtualDisplay = mediaProjection?.createVirtualDisplay(
-                "OverlayCapture",
-                width, height, density,
-                flags,
-                imageReader!!.surface,
-                null, null
-            )
-            Log.d(TAG, "VirtualDisplay created: ${width}x${height}")
+            virtualDisplay =
+                mediaProjection?.createVirtualDisplay(
+                    "OverlayCapture",
+                    width,
+                    height,
+                    density,
+                    flags,
+                    imageReader!!.surface,
+                    null,
+                    null,
+                )
+            Log.d(TAG, "VirtualDisplay created: ${width}x$height")
 
             Handler(Looper.getMainLooper()).postDelayed({
                 acquireImageWithRetry(3, width, height)
@@ -530,9 +657,13 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         }
     }
 
-    private fun acquireImageWithRetry(remainingRetries: Int, width: Int, height: Int) {
+    private fun acquireImageWithRetry(
+        remainingRetries: Int,
+        width: Int,
+        height: Int,
+    ) {
         val image = imageReader?.acquireLatestImage()
-        
+
         if (image == null) {
             if (remainingRetries > 0) {
                 Log.d(TAG, "No image available, retrying... ($remainingRetries retries left)")
@@ -562,11 +693,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                     val rowPadding = rowStride - pixelStride * width
 
                     val bitmapWidth = width + if (rowPadding > 0) rowPadding / pixelStride else 0
-                    var bitmap = Bitmap.createBitmap(
-                        bitmapWidth,
-                        height,
-                        Bitmap.Config.ARGB_8888
-                    )
+                    var bitmap =
+                        Bitmap.createBitmap(
+                            bitmapWidth,
+                            height,
+                            Bitmap.Config.ARGB_8888,
+                        )
                     bitmap.copyPixelsFromBuffer(buffer)
                     image.close()
 
@@ -596,8 +728,8 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                             mapOf(
                                 "bytes" to byteArray,
                                 "width" to width,
-                                "height" to height
-                            )
+                                "height" to height,
+                            ),
                         )
                         pendingScreenshotResult = null
                     }
@@ -653,9 +785,24 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     private fun setOverlayAlpha(alpha: Float) {
         try {
             windowManager?.let { wm ->
-                scrimView?.let { v -> scrimParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
-                flutterView?.let { v -> flutterParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
-                navBarSentinel?.let { v -> navBarParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
+                scrimView?.let { v ->
+                    scrimParams?.let { p ->
+                        p.alpha = alpha
+                        wm.updateViewLayout(v, p)
+                    }
+                }
+                flutterView?.let { v ->
+                    flutterParams?.let { p ->
+                        p.alpha = alpha
+                        wm.updateViewLayout(v, p)
+                    }
+                }
+                navBarSentinel?.let { v ->
+                    navBarParams?.let { p ->
+                        p.alpha = alpha
+                        wm.updateViewLayout(v, p)
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error setting overlay alpha", e)
@@ -717,16 +864,17 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
             engine.lifecycleChannel.appIsResumed()
         }
 
-        flutterView = FlutterView(applicationContext, FlutterTextureView(applicationContext)).apply {
-            val flutterEngine = engine
-            if (flutterEngine != null) {
-                attachToFlutterEngine(flutterEngine)
+        flutterView =
+            FlutterView(applicationContext, FlutterTextureView(applicationContext)).apply {
+                val flutterEngine = engine
+                if (flutterEngine != null) {
+                    attachToFlutterEngine(flutterEngine)
+                }
+                fitsSystemWindows = true
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setBackgroundColor(Color.TRANSPARENT)
             }
-            fitsSystemWindows = true
-            isFocusable = true
-            isFocusableInTouchMode = true
-            setBackgroundColor(Color.TRANSPARENT)
-        }
 
         flutterChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -734,19 +882,23 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                     closeOverlay()
                     result.success(true)
                 }
+
                 "hide" -> {
                     hideOverlay()
                     result.success(true)
                 }
+
                 "show" -> {
                     showOverlayAfterHide()
                     result.success(true)
                 }
+
                 "focusable" -> {
                     val focusable = call.argument<Boolean>("enable") ?: false
                     updateFlags(focusable)
                     result.success(true)
                 }
+
                 "readClipboard" -> {
                     if (pendingClipboardResult != null) {
                         Log.w(TAG, "Previous clipboard read still pending, rejecting")
@@ -754,27 +906,33 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                         return@setMethodCallHandler
                     }
                     try {
-                        val clipboardManager = applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clipboardManager =
+                            applicationContext.getSystemService(
+                                Context.CLIPBOARD_SERVICE,
+                            ) as android.content.ClipboardManager
                         val clipData = clipboardManager.primaryClip
                         if (clipData != null && clipData.itemCount > 0) {
                             val text = clipData.getItemAt(0).text?.toString() ?: ""
                             if (BuildConfig.DEBUG) {
                                 Log.d("ClipboardDebug", "served via: direct, ${text.length} chars")
                             }
-                            result.success(mapOf(
-                                "text" to text,
-                                "source" to "direct",
-                                "timestamp" to System.currentTimeMillis(),
-                                "stale" to false
-                            ))
+                            result.success(
+                                mapOf(
+                                    "text" to text,
+                                    "source" to "direct",
+                                    "timestamp" to System.currentTimeMillis(),
+                                    "stale" to false,
+                                ),
+                            )
                         } else {
                             Log.d(TAG, "Clipboard direct read null, trying relay Activity")
                             pendingClipboardResult = result
                             isReadingClipboard = true
-                            val intent = Intent(this@TranslationOverlayService, OverlayRelayActivity::class.java).apply {
-                                putExtra("action", "read_clipboard")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            }
+                            val intent =
+                                Intent(this@TranslationOverlayService, OverlayRelayActivity::class.java).apply {
+                                    putExtra("action", "read_clipboard")
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                }
                             startActivity(intent)
                             Handler(Looper.getMainLooper()).postDelayed({
                                 if (pendingClipboardResult != null) {
@@ -782,12 +940,14 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                                     if (cacheText.isNotEmpty()) {
                                         val ageMs = System.currentTimeMillis() - MainActivity.clipboardCacheTimestamp
                                         val isStale = ageMs > MainActivity.CACHE_TTL_MS
-                                        pendingClipboardResult?.success(mapOf(
-                                            "text" to cacheText,
-                                            "source" to "cache",
-                                            "timestamp" to MainActivity.clipboardCacheTimestamp,
-                                            "stale" to isStale
-                                        ))
+                                        pendingClipboardResult?.success(
+                                            mapOf(
+                                                "text" to cacheText,
+                                                "source" to "cache",
+                                                "timestamp" to MainActivity.clipboardCacheTimestamp,
+                                                "stale" to isStale,
+                                            ),
+                                        )
                                     } else {
                                         pendingClipboardResult?.error("EMPTY", "Clipboard is empty", null)
                                     }
@@ -801,16 +961,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                         val cacheText = MainActivity.clipboardCache
                         if (cacheText.isNotEmpty()) {
                             val ageMs = System.currentTimeMillis() - MainActivity.clipboardCacheTimestamp
-                        if (BuildConfig.DEBUG) {
-                            Log.d("ClipboardDebug", "served via: cache (exception fallback), age=${ageMs}ms")
-                        }
-                        val isStale = ageMs > MainActivity.CACHE_TTL_MS
-                            result.success(mapOf(
-                                "text" to cacheText,
-                                "source" to "cache",
-                                "timestamp" to MainActivity.clipboardCacheTimestamp,
-                                "stale" to isStale
-                            ))
+                            if (BuildConfig.DEBUG) {
+                                Log.d("ClipboardDebug", "served via: cache (exception fallback), age=${ageMs}ms")
+                            }
+                            val isStale = ageMs > MainActivity.CACHE_TTL_MS
+                            result.success(
+                                mapOf(
+                                    "text" to cacheText,
+                                    "source" to "cache",
+                                    "timestamp" to MainActivity.clipboardCacheTimestamp,
+                                    "stale" to isStale,
+                                ),
+                            )
                         } else {
                             result.error("CLIPBOARD_ERROR", e.message, null)
                         }
@@ -818,13 +980,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                         pendingClipboardResult = null
                     }
                 }
+
                 "writeClipboard" -> {
                     try {
                         val text = call.argument<String>("text") ?: ""
+                        val mode = call.argument<String>("mode") ?: "plain"
+                        val processed = if (mode == "markdown") text else stripMarkdownForClipboard(text)
                         val clipboard = applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("translated", text))
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("translated", processed))
                         if (BuildConfig.DEBUG) {
-                            Log.d("ClipboardDebug", "write: ${text.length} chars")
+                            Log.d("ClipboardDebug", "write ($mode): ${processed.length} chars (from ${text.length})")
                         }
                         result.success(true)
                     } catch (e: Exception) {
@@ -832,7 +997,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                         result.error("CLIPBOARD_ERROR", e.message, null)
                     }
                 }
-                else -> result.notImplemented()
+
+                else -> {
+                    result.notImplemented()
+                }
             }
         }
 
@@ -853,75 +1021,85 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
 
         val overlayHeight = contentHeight()
 
-        val scrimLayoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            overlayHeight,
-            0, 0,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-            PixelFormat.TRANSLUCENT
-        )
+        val scrimLayoutParams =
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                overlayHeight,
+                0,
+                0,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                },
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                PixelFormat.TRANSLUCENT,
+            )
         scrimLayoutParams.gravity = Gravity.TOP
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            overlayHeight,
-            0, 0,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-            PixelFormat.TRANSLUCENT
-        )
+        val params =
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                overlayHeight,
+                0,
+                0,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                },
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT,
+            )
         params.gravity = Gravity.TOP
 
-        scrimView = View(this).apply {
-            setBackgroundColor(Color.parseColor("#80000000"))
-            setOnTouchListener(this@TranslationOverlayService)
-        }
+        scrimView =
+            View(this).apply {
+                setBackgroundColor(Color.parseColor("#80000000"))
+                setOnTouchListener(this@TranslationOverlayService)
+            }
 
         val navBarHeight = navigationBarHeightPx()
-        val navBarLayoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            navBarHeight,
-            0, screenHeight() - navBarHeight,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        )
+        val navBarLayoutParams =
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                navBarHeight,
+                0,
+                screenHeight() - navBarHeight,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                },
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT,
+            )
         navBarLayoutParams.gravity = Gravity.TOP
 
-        navBarSentinel = View(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            setOnTouchListener { _, event ->
-                Log.d(TAG, "Nav bar sentinel touched: action=${event.action}")
-                if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_OUTSIDE) {
-                    closeOverlay()
-                    true
-                } else false
+        navBarSentinel =
+            View(this).apply {
+                setBackgroundColor(Color.TRANSPARENT)
+                setOnTouchListener { _, event ->
+                    Log.d(TAG, "Nav bar sentinel touched: action=${event.action}")
+                    if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_OUTSIDE) {
+                        closeOverlay()
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
-        }
 
         try {
             scrimParams = scrimLayoutParams
@@ -940,11 +1118,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     private fun updateFlags(focusable: Boolean) {
         try {
             val currentParams = flutterView?.layoutParams as? WindowManager.LayoutParams ?: return
-            val newFlags = if (focusable) {
-                currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-            } else {
-                currentParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-            }
+            val newFlags =
+                if (focusable) {
+                    currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                } else {
+                    currentParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                }
             currentParams.flags = newFlags
             windowManager?.updateViewLayout(flutterView, currentParams)
             isFocusable = focusable
@@ -1004,8 +1183,8 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         stopSelf()
     }
 
-    private fun screenHeight(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    private fun screenHeight(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             windowManager?.currentWindowMetrics?.bounds?.height() ?: 0
         } else {
             @Suppress("DEPRECATION")
@@ -1013,20 +1192,19 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
             windowManager?.defaultDisplay?.getRealMetrics(dm)
             dm.heightPixels
         }
-    }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    private fun contentHeight(): Int {
-        return screenHeight() - navigationBarHeightPx()
-    }
+    private fun contentHeight(): Int = screenHeight() - navigationBarHeightPx()
 
     private fun statusBarHeightPx(): Int {
         if (statusBarHeight == -1) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 windowManager?.let { wm ->
-                    val insets = wm.currentWindowMetrics.windowInsets.getInsets(
-                        android.view.WindowInsets.Type.statusBars()
-                    )
+                    val insets =
+                        wm.currentWindowMetrics.windowInsets.getInsets(
+                            android.view.WindowInsets.Type
+                                .statusBars(),
+                        )
                     if (insets.top > 0) {
                         statusBarHeight = insets.top
                         return statusBarHeight
@@ -1034,11 +1212,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                 }
             }
             val id = resources.getIdentifier("status_bar_height", "dimen", "android")
-            statusBarHeight = if (id > 0) {
-                resources.getDimensionPixelSize(id)
-            } else {
-                dpToPx(DEFAULT_STATUS_BAR_HEIGHT_DP)
-            }
+            statusBarHeight =
+                if (id > 0) {
+                    resources.getDimensionPixelSize(id)
+                } else {
+                    dpToPx(DEFAULT_STATUS_BAR_HEIGHT_DP)
+                }
         }
         return statusBarHeight
     }
@@ -1047,9 +1226,11 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
         if (navigationBarHeight == -1) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 windowManager?.let { wm ->
-                    val insets = wm.currentWindowMetrics.windowInsets.getInsets(
-                        android.view.WindowInsets.Type.navigationBars()
-                    )
+                    val insets =
+                        wm.currentWindowMetrics.windowInsets.getInsets(
+                            android.view.WindowInsets.Type
+                                .navigationBars(),
+                        )
                     if (insets.bottom > 0) {
                         navigationBarHeight = insets.bottom
                         return navigationBarHeight
@@ -1057,22 +1238,24 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                 }
             }
             val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
-            navigationBarHeight = if (id > 0) {
-                resources.getDimensionPixelSize(id)
-            } else {
-                dpToPx(DEFAULT_NAV_BAR_HEIGHT_DP)
-            }
+            navigationBarHeight =
+                if (id > 0) {
+                    resources.getDimensionPixelSize(id)
+                } else {
+                    dpToPx(DEFAULT_NAV_BAR_HEIGHT_DP)
+                }
         }
         return navigationBarHeight
     }
 
-    private fun dpToPx(dp: Int): Int {
-        return (android.util.TypedValue.applyDimension(
-            android.util.TypedValue.COMPLEX_UNIT_DIP,
-            dp.toFloat(),
-            resources.displayMetrics
-        )).toInt()
-    }
+    private fun dpToPx(dp: Int): Int =
+        (
+            android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP,
+                dp.toFloat(),
+                resources.displayMetrics,
+            )
+        ).toInt()
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy called")
@@ -1101,7 +1284,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    override fun onTouch(view: View, event: MotionEvent): Boolean {
+    override fun onTouch(
+        view: View,
+        event: MotionEvent,
+    ): Boolean {
         Log.d(TAG, "onTouch action: ${event.action}, view: ${view::class.simpleName}, isHidden: $isHidden")
         if (isHidden) {
             return false
@@ -1112,11 +1298,13 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
                 closeOverlay()
                 return true
             }
+
             MotionEvent.ACTION_DOWN -> {
                 dragging = false
                 lastX = event.rawX
                 lastY = event.rawY
             }
+
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - lastX
                 val dy = event.rawY - lastY

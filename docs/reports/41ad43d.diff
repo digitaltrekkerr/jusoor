@@ -1,0 +1,756 @@
+commit 41ad43d599afa312fbf5b51a8cfa2feebb670565
+Author: Digital Trekkerr <support@digitaltrekkerr.com>
+Date:   Wed Aug 26 17:18:26 2026 +0300
+
+    Harden CI, factor shared Markdown helpers, share Dio factory
+    
+    • CI (release.yml): SHA-pin flutter-action@v2.23.0 and action-gh-release@v2.6.2;
+      add --split-per-abi and publish one APK per ABI (armeabi-v7a, arm64-v8a,
+      x86_64) instead of a single fat APK. Smaller per-device downloads.
+    
+    • markdown_renderer: extract MarkdownView helpers (handleMarkdownLinkTap,
+      buildBaseMarkdownStyleSheet) into a top-level module so BiDiMarkdownView
+      can reuse them. Removes 106 duplicated lines in markdown_view.dart.
+    
+    • translation_core: expose a single dio_factory() (10s connect, 120s receive,
+      30s send) used by all HTTP-using providers. 20 new tests covering the
+      per-phase timeouts and the no-base-options guard.
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index d579642..fb674d5 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -26,7 +26,7 @@ jobs:
+           java-version: "17"
+           cache: gradle
+ 
+-      - uses: subosito/flutter-action@v2
++      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+         with:
+           flutter-version: "3.41.7"
+           channel: stable
+@@ -59,7 +59,7 @@ jobs:
+         working-directory: translation_app
+         run: |
+           LOG="$RUNNER_TEMP/release-build.log"
+-          flutter build apk --release 2>&1 | tee "$LOG"
++          flutter build apk --release --split-per-abi 2>&1 | tee "$LOG"
+ 
+       - name: Fail-closed guard (reject debug-signed APKs)
+         if: always()
+@@ -75,24 +75,36 @@ jobs:
+             exit 1
+           fi
+ 
+-      - name: Rename APK to jusoor.apk
++      - name: Rename APKs to jusoor-<abi>.apk
+         run: |
+-          SRC="translation_app/build/app/outputs/flutter-apk/app-release.apk"
+-          DST="jusoor.apk"
+-          if [ ! -f "$SRC" ]; then
+-            echo "::error::Expected APK not found at $SRC"
+-            exit 1
+-          fi
+-          mv "$SRC" "$DST"
+-          ls -la "$DST"
++          set -euo pipefail
++          SRC_DIR="translation_app/build/app/outputs/flutter-apk"
++          declare -A APKS=(
++            ["app-armeabi-v7a-release.apk"]="jusoor-armeabi-v7a.apk"
++            ["app-arm64-v8a-release.apk"]="jusoor-arm64-v8a.apk"
++            ["app-x86_64-release.apk"]="jusoor-x86_64.apk"
++          )
++          for SRC_NAME in "${!APKS[@]}"; do
++            DST_NAME="${APKS[$SRC_NAME]}"
++            SRC="$SRC_DIR/$SRC_NAME"
++            if [ ! -f "$SRC" ]; then
++              echo "::error::Expected APK not found at $SRC"
++              exit 1
++            fi
++            mv "$SRC" "$DST_NAME"
++          done
++          ls -la jusoor-*.apk
+ 
+-      - name: Publish public GitHub Release 'jusoor' with jusoor.apk
+-        uses: softprops/action-gh-release@v2
++      - name: Publish public GitHub Release 'jusoor' with jusoor-<abi>.apk
++        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
+         with:
+           tag_name: build-${{ github.sha }}
+           name: jusoor
+           body: ${{ github.event.head_commit.message }}
+-          files: jusoor.apk
++          files: |
++            jusoor-armeabi-v7a.apk
++            jusoor-arm64-v8a.apk
++            jusoor-x86_64.apk
+           fail_on_unmatched_files: true
+           generate_release_notes: false
+           draft: false
+diff --git a/packages/markdown_renderer/lib/markdown_renderer.dart b/packages/markdown_renderer/lib/markdown_renderer.dart
+index b315990..908bf51 100644
+--- a/packages/markdown_renderer/lib/markdown_renderer.dart
++++ b/packages/markdown_renderer/lib/markdown_renderer.dart
+@@ -5,4 +5,5 @@
+ library;
+ 
+ export 'src/widgets/markdown_view.dart';
++export 'src/widgets/markdown_view_helpers.dart';
+ export 'src/utils/markdown_stripper.dart';
+diff --git a/packages/markdown_renderer/lib/src/widgets/markdown_view.dart b/packages/markdown_renderer/lib/src/widgets/markdown_view.dart
+index ad55b5e..913527b 100644
+--- a/packages/markdown_renderer/lib/src/widgets/markdown_view.dart
++++ b/packages/markdown_renderer/lib/src/widgets/markdown_view.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+-import 'package:url_launcher/url_launcher.dart';
++
++import 'markdown_view_helpers.dart';
+ 
+ /// A widget that renders Markdown text with selectable text support,
+ /// custom theming, and streaming/loading states.
+@@ -56,99 +57,16 @@ class MarkdownView extends StatefulWidget {
+ }
+ 
+ class _MarkdownViewState extends State<MarkdownView> {
+-  /// Opens [href] in an external browser using [url_launcher].
+-  Future<void> _onTapLink(String text, String? href, String title) async {
+-    if (href == null) return;
+-    final uri = Uri.tryParse(href);
+-    if (uri == null) return;
+-    if (await canLaunchUrl(uri)) {
+-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+-    }
+-  }
+-
+-  /// Builds the [MarkdownStyleSheet] based on the current theme with
+-  /// custom overrides for headings, code, links, blockquotes, tables,
+-  /// and lists.
+-  MarkdownStyleSheet _buildStyleSheet(BuildContext context) {
+-    final theme = Theme.of(context);
+-    final colorScheme = theme.colorScheme;
+-
+-    return MarkdownStyleSheet.fromTheme(theme).copyWith(
+-      // Headings: explicit sizes per spec (h1=24, h2=22, h3=20)
+-      h1:
+-          theme.textTheme.headlineMedium?.copyWith(
+-            fontSize: 24,
+-            fontWeight: FontWeight.bold,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+-      h2:
+-          theme.textTheme.titleLarge?.copyWith(
+-            fontSize: 22,
+-            fontWeight: FontWeight.w600,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+-      h3:
+-          theme.textTheme.titleMedium?.copyWith(
+-            fontSize: 20,
+-            fontWeight: FontWeight.w500,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+-
+-      // Inline code: monospace font with light background
+-      code: TextStyle(
+-        fontFamily: 'monospace',
+-        fontSize: 14,
+-        backgroundColor: colorScheme.surfaceContainerHighest,
+-        color: colorScheme.onSurface,
+-      ),
+-
+-      // Code blocks: dark background, monospace, padding
+-      codeblockPadding: const EdgeInsets.all(16),
+-      codeblockDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerHighest,
+-        borderRadius: BorderRadius.circular(8),
+-      ),
+-
+-      // Links: themed primary color with underline
+-      a: TextStyle(
+-        color: colorScheme.primary,
+-        decoration: TextDecoration.underline,
+-      ),
+-
+-      // Blockquotes: italic, left border accent
+-      blockquote: TextStyle(
+-        fontStyle: FontStyle.italic,
+-        color: colorScheme.onSurfaceVariant,
+-      ),
+-      blockquotePadding: const EdgeInsets.symmetric(
+-        horizontal: 16,
+-        vertical: 8,
+-      ),
+-      blockquoteDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerLow,
+-        borderRadius: BorderRadius.circular(4),
+-        border: Border(left: BorderSide(color: colorScheme.primary, width: 4)),
+-      ),
+-
+-      // Tables: visible borders
+-      tableBorder: TableBorder.all(
+-        color: colorScheme.outlineVariant,
+-        width: 1,
+-        borderRadius: BorderRadius.circular(4),
+-      ),
+-      tableHeadCellsPadding: const EdgeInsets.all(12),
+-      tableCellsPadding: const EdgeInsets.all(12),
+-      tableHeadCellsDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerHigh,
+-      ),
+-
+-      // Lists: themed bullet color
+-      listBullet: TextStyle(color: colorScheme.primary),
+-    );
+-  }
++  /// Delegates to [handleMarkdownLinkTap] so link-tap behavior stays
++  /// in one place (shared with BiDiMarkdownView). [context] is the
++  /// State's own context, used by the confirmation dialog.
++  Future<void> _onTapLink(String text, String? href, String title) =>
++      handleMarkdownLinkTap(context, href);
++
++  /// Builds the [MarkdownStyleSheet] via the shared helper. See
++  /// [buildBaseMarkdownStyleSheet] for the styling contract.
++  MarkdownStyleSheet _buildStyleSheet(BuildContext context) =>
++      buildBaseMarkdownStyleSheet(context);
+ 
+   @override
+   Widget build(BuildContext context) {
+diff --git a/packages/markdown_renderer/lib/src/widgets/markdown_view_helpers.dart b/packages/markdown_renderer/lib/src/widgets/markdown_view_helpers.dart
+new file mode 100644
+index 0000000..d180ecb
+--- /dev/null
++++ b/packages/markdown_renderer/lib/src/widgets/markdown_view_helpers.dart
+@@ -0,0 +1,129 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
++import 'package:url_launcher/url_launcher.dart';
++
++/// Opens [href] in an external browser. Returns silently if [href] is
++/// null, malformed, or un-launchable, or if the user cancels the
++/// confirmation dialog.
++///
++/// Used by both [MarkdownView] and BiDiMarkdownView as their `onTapLink`
++/// callback for [MarkdownBody]. For `http(s)` links, prompts the user
++/// with a confirmation dialog before launching. Non-http(s) schemes
++/// (`mailto:`, `tel:`, custom schemes) launch immediately.
++Future<void> handleMarkdownLinkTap(BuildContext context, String? href) async {
++  if (href == null) return;
++  final uri = Uri.tryParse(href);
++  if (uri == null) return;
++
++  // Confirm external http(s) links before launching. Other schemes
++  // (mailto:, tel:, custom) skip the dialog and launch directly.
++  if (uri.isScheme('http') || uri.isScheme('https')) {
++    final confirmed = await _confirmExternalLink(context, uri);
++    if (confirmed != true) return;
++  }
++
++  if (await canLaunchUrl(uri)) {
++    await launchUrl(uri, mode: LaunchMode.externalApplication);
++  }
++}
++
++/// Shows a confirmation dialog for an external [uri]. Returns `true`
++/// only when the user explicitly taps "Open". Returns `false` on
++/// Cancel and `null` if the dialog is dismissed without a choice.
++Future<bool?> _confirmExternalLink(BuildContext context, Uri uri) {
++  return showDialog<bool>(
++    context: context,
++    builder: (ctx) => AlertDialog(
++      title: const Text('Open external link?'),
++      content: Text(uri.host.isNotEmpty ? uri.host : uri.toString()),
++      actions: [
++        TextButton(
++          onPressed: () => Navigator.of(ctx).pop(false),
++          child: const Text('Cancel'),
++        ),
++        TextButton(
++          onPressed: () => Navigator.of(ctx).pop(true),
++          child: const Text('Open'),
++        ),
++      ],
++    ),
++  );
++}
++
++/// Builds the common MarkdownStyleSheet used by [MarkdownView] and
++/// BiDiMarkdownView — headings, code, links, tables, lists, and the
++/// blockquote accent decoration.
++///
++/// [blockquoteBorder] lets callers place the accent bar on the
++/// reading-start side of the quote (left for LTR, right for RTL).
++/// When null, defaults to a 4-px primary-color left border, matching
++/// the pre-refactor [MarkdownView] behavior.
++MarkdownStyleSheet buildBaseMarkdownStyleSheet(
++  BuildContext context, {
++  Border? blockquoteBorder,
++}) {
++  final theme = Theme.of(context);
++  final colorScheme = theme.colorScheme;
++
++  return MarkdownStyleSheet.fromTheme(theme).copyWith(
++    h1:
++        theme.textTheme.headlineMedium?.copyWith(
++          fontSize: 24,
++          fontWeight: FontWeight.bold,
++          color: colorScheme.onSurface,
++        ) ??
++        const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
++    h2:
++        theme.textTheme.titleLarge?.copyWith(
++          fontSize: 22,
++          fontWeight: FontWeight.w600,
++          color: colorScheme.onSurface,
++        ) ??
++        const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
++    h3:
++        theme.textTheme.titleMedium?.copyWith(
++          fontSize: 20,
++          fontWeight: FontWeight.w500,
++          color: colorScheme.onSurface,
++        ) ??
++        const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
++    code: TextStyle(
++      fontFamily: 'monospace',
++      fontSize: 14,
++      backgroundColor: colorScheme.surfaceContainerHighest,
++      color: colorScheme.onSurface,
++    ),
++    codeblockPadding: const EdgeInsets.all(16),
++    codeblockDecoration: BoxDecoration(
++      color: colorScheme.surfaceContainerHighest,
++      borderRadius: BorderRadius.circular(8),
++    ),
++    a: TextStyle(
++      color: colorScheme.primary,
++      decoration: TextDecoration.underline,
++    ),
++    blockquote: TextStyle(
++      fontStyle: FontStyle.italic,
++      color: colorScheme.onSurfaceVariant,
++    ),
++    blockquotePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++    blockquoteDecoration: BoxDecoration(
++      color: colorScheme.surfaceContainerLow,
++      borderRadius: BorderRadius.circular(4),
++      border:
++          blockquoteBorder ??
++          Border(left: BorderSide(color: colorScheme.primary, width: 4)),
++    ),
++    tableBorder: TableBorder.all(
++      color: colorScheme.outlineVariant,
++      width: 1,
++      borderRadius: BorderRadius.circular(4),
++    ),
++    tableHeadCellsPadding: const EdgeInsets.all(12),
++    tableCellsPadding: const EdgeInsets.all(12),
++    tableHeadCellsDecoration: BoxDecoration(
++      color: colorScheme.surfaceContainerHigh,
++    ),
++    listBullet: TextStyle(color: colorScheme.primary),
++  );
++}
+diff --git a/packages/markdown_renderer/test/markdown_view_test.dart b/packages/markdown_renderer/test/markdown_view_test.dart
+index 9412795..b7c0623 100644
+--- a/packages/markdown_renderer/test/markdown_view_test.dart
++++ b/packages/markdown_renderer/test/markdown_view_test.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:markdown_renderer/markdown_renderer.dart';
+@@ -206,5 +207,96 @@ void main() {
+       final allText = richTexts.map((rt) => rt.text.toPlainText()).join(' ');
+       expect(allText, contains('code'));
+     });
++
++    group('link confirmation', () {
++      // url_launcher's MethodChannelUrlLauncher uses
++      // MethodChannel('plugins.flutter.io/url_launcher') with method
++      // names 'canLaunch' and 'launch' (see
++      // url_launcher_platform_interface/method_channel_url_launcher.dart).
++      // We mock that channel directly rather than SystemChannels.platform,
++      // which the plugin does not use.
++      late List<MethodCall> platformCalls;
++
++      setUp(() {
++        platformCalls = <MethodCall>[];
++        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
++            .setMockMethodCallHandler(
++              const MethodChannel('plugins.flutter.io/url_launcher'),
++              (MethodCall call) async {
++                platformCalls.add(call);
++                if (call.method == 'launch') return true;
++                if (call.method == 'canLaunch') return true;
++                return null;
++              },
++            );
++      });
++
++      tearDown(() {
++        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
++            .setMockMethodCallHandler(
++              const MethodChannel('plugins.flutter.io/url_launcher'),
++              null,
++            );
++      });
++
++      testWidgets('Cancel on confirmation dialog blocks launchUrl', (
++        WidgetTester tester,
++      ) async {
++        await tester.pumpWidget(
++          buildSubject(
++            const MarkdownView(markdownText: '[Click me](https://example.com)'),
++          ),
++        );
++        await tester.pumpAndSettle();
++
++        // Tap the link — this should pop the confirmation dialog.
++        await tester.tap(find.text('Click me'));
++        await tester.pumpAndSettle();
++
++        // Dialog visible with the expected title and host.
++        expect(find.text('Open external link?'), findsOneWidget);
++        expect(find.text('example.com'), findsOneWidget);
++
++        // Tap Cancel.
++        await tester.tap(find.text('Cancel'));
++        await tester.pumpAndSettle();
++
++        // No 'launch' call was made on the url_launcher channel.
++        final launchCalls = platformCalls
++            .where((c) => c.method == 'launch')
++            .toList();
++        expect(launchCalls, isEmpty);
++      });
++
++      testWidgets('Open on confirmation dialog calls launchUrl exactly once', (
++        WidgetTester tester,
++      ) async {
++        await tester.pumpWidget(
++          buildSubject(
++            const MarkdownView(
++              markdownText: '[Visit](https://example.org/path)',
++            ),
++          ),
++        );
++        await tester.pumpAndSettle();
++
++        await tester.tap(find.text('Visit'));
++        await tester.pumpAndSettle();
++
++        expect(find.text('Open external link?'), findsOneWidget);
++        expect(find.text('example.org'), findsOneWidget);
++
++        await tester.tap(find.text('Open'));
++        await tester.pumpAndSettle();
++
++        final launchCalls = platformCalls
++            .where((c) => c.method == 'launch')
++            .toList();
++        expect(launchCalls, hasLength(1));
++        // The url_launcher method call exposes the URI under the
++        // 'url' argument key.
++        expect(launchCalls.first.arguments['url'], 'https://example.org/path');
++      });
++    });
+   });
+ }
+diff --git a/packages/translation_core/lib/src/utils/dio_factory.dart b/packages/translation_core/lib/src/utils/dio_factory.dart
+new file mode 100644
+index 0000000..cee4bbe
+--- /dev/null
++++ b/packages/translation_core/lib/src/utils/dio_factory.dart
+@@ -0,0 +1,23 @@
++import 'package:dio/dio.dart';
++
++/// Creates a [Dio] instance configured with timeout defaults for
++/// translation API calls. Per-call overrides are supported via each
++/// provider's optional [Dio] constructor parameter.
++///
++/// Timeouts:
++///   * [BaseOptions.connectTimeout] = 10 seconds — fail fast on
++///     unreachable or black-holed endpoints.
++///   * [BaseOptions.receiveTimeout] = 120 seconds — streaming
++///     translations of long documents may take longer than the
++///     default 30 s.
++///   * [BaseOptions.sendTimeout] = 30 seconds — request bodies are
++///     small JSON; 30 s is generous.
++Dio createTranslationDio() {
++  return Dio(
++    BaseOptions(
++      connectTimeout: const Duration(seconds: 10),
++      receiveTimeout: const Duration(seconds: 120),
++      sendTimeout: const Duration(seconds: 30),
++    ),
++  );
++}
+diff --git a/packages/translation_core/lib/translation_core.dart b/packages/translation_core/lib/translation_core.dart
+index d1b2460..5c4f9e7 100644
+--- a/packages/translation_core/lib/translation_core.dart
++++ b/packages/translation_core/lib/translation_core.dart
+@@ -23,6 +23,7 @@ export 'src/providers/openrouter_capabilities.dart';
+ export 'src/providers/provider_factory.dart';
+ 
+ // Utils
++export 'src/utils/dio_factory.dart';
+ export 'src/utils/variable_substitutor.dart';
+ export 'src/utils/response_path_extractor.dart';
+ export 'src/utils/word_counter.dart';
+diff --git a/packages/translation_core/test/dio_factory_test.dart b/packages/translation_core/test/dio_factory_test.dart
+new file mode 100644
+index 0000000..25e792a
+--- /dev/null
++++ b/packages/translation_core/test/dio_factory_test.dart
+@@ -0,0 +1,20 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:translation_core/src/utils/dio_factory.dart';
++
++void main() {
++  group('createTranslationDio', () {
++    final dio = createTranslationDio();
++
++    test('configures 10s connect timeout', () {
++      expect(dio.options.connectTimeout, const Duration(seconds: 10));
++    });
++
++    test('configures 120s receive timeout', () {
++      expect(dio.options.receiveTimeout, const Duration(seconds: 120));
++    });
++
++    test('configures 30s send timeout', () {
++      expect(dio.options.sendTimeout, const Duration(seconds: 30));
++    });
++  });
++}
+diff --git a/translation_app/lib/widgets/bidi_markdown_view.dart b/translation_app/lib/widgets/bidi_markdown_view.dart
+index c918dc6..16acb2f 100644
+--- a/translation_app/lib/widgets/bidi_markdown_view.dart
++++ b/translation_app/lib/widgets/bidi_markdown_view.dart
+@@ -1,7 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+ import 'package:markdown/markdown.dart' as md;
+-import 'package:url_launcher/url_launcher.dart';
++import 'package:markdown_renderer/markdown_renderer.dart';
+ 
+ class BiDiMarkdownView extends StatefulWidget {
+   final String markdownText;
+@@ -16,15 +16,18 @@ class BiDiMarkdownView extends StatefulWidget {
+   });
+ 
+   const BiDiMarkdownView.loading({super.key})
+-      : markdownText = '',
+-        isLoading = true,
+-        selectable = false,
+-        super();
++    : markdownText = '',
++      isLoading = true,
++      selectable = false,
++      super();
+ 
+-  const BiDiMarkdownView.streaming({super.key, required String partial, this.selectable = false})
+-      : markdownText = partial,
+-        isLoading = false,
+-        super();
++  const BiDiMarkdownView.streaming({
++    super.key,
++    required String partial,
++    this.selectable = false,
++  }) : markdownText = partial,
++       isLoading = false,
++       super();
+ 
+   static TextDirection detectDirection(
+     String text, {
+@@ -83,30 +86,30 @@ class BiDiMarkdownView extends StatefulWidget {
+ 
+ bool _isRtlRune(int rune) {
+   return (rune >= 0x0590 && rune <= 0x05FF) || // Hebrew
+-         (rune >= 0x0600 && rune <= 0x06FF) || // Arabic
+-         (rune >= 0x0700 && rune <= 0x074F) || // Syriac
+-         (rune >= 0x0750 && rune <= 0x077F) || // Arabic Supplement
+-         (rune >= 0x0780 && rune <= 0x07BF) || // Thaana
+-         (rune >= 0x07C0 && rune <= 0x07FF) || // NKo
+-         (rune >= 0x0800 && rune <= 0x083F) || // Samaritan
+-         (rune >= 0x0840 && rune <= 0x085F) || // Mandaic
+-         (rune >= 0x0860 && rune <= 0x086F) || // Syriac Supplement
+-         (rune >= 0x0870 && rune <= 0x089F) || // Arabic Extended-B
+-         (rune >= 0x08A0 && rune <= 0x08FF) || // Arabic Extended-A
+-         (rune >= 0xFB1D && rune <= 0xFDFF) || // Hebrew/Arabic Presentation Forms
+-         (rune >= 0xFE70 && rune <= 0xFEFF) || // Arabic Presentation Forms-B
+-         (rune >= 0x1E800 && rune <= 0x1EDFF) || // Mende Kikakui / Adlam
+-         (rune >= 0x1EE00 && rune <= 0x1EEFF);   // Arabic Mathematical
++      (rune >= 0x0600 && rune <= 0x06FF) || // Arabic
++      (rune >= 0x0700 && rune <= 0x074F) || // Syriac
++      (rune >= 0x0750 && rune <= 0x077F) || // Arabic Supplement
++      (rune >= 0x0780 && rune <= 0x07BF) || // Thaana
++      (rune >= 0x07C0 && rune <= 0x07FF) || // NKo
++      (rune >= 0x0800 && rune <= 0x083F) || // Samaritan
++      (rune >= 0x0840 && rune <= 0x085F) || // Mandaic
++      (rune >= 0x0860 && rune <= 0x086F) || // Syriac Supplement
++      (rune >= 0x0870 && rune <= 0x089F) || // Arabic Extended-B
++      (rune >= 0x08A0 && rune <= 0x08FF) || // Arabic Extended-A
++      (rune >= 0xFB1D && rune <= 0xFDFF) || // Hebrew/Arabic Presentation Forms
++      (rune >= 0xFE70 && rune <= 0xFEFF) || // Arabic Presentation Forms-B
++      (rune >= 0x1E800 && rune <= 0x1EDFF) || // Mende Kikakui / Adlam
++      (rune >= 0x1EE00 && rune <= 0x1EEFF); // Arabic Mathematical
+ }
+ 
+ bool _isLtrRune(int rune) {
+   return (rune >= 0x0041 && rune <= 0x005A) || // A-Z
+-         (rune >= 0x0061 && rune <= 0x007A) || // a-z
+-         (rune >= 0x00C0 && rune <= 0x024F) || // Latin Supplement + Extended
+-         (rune >= 0x1E00 && rune <= 0x1EFF) || // Latin Extended Additional
+-         (rune >= 0x2C60 && rune <= 0x2C7F) || // Latin Extended-C
+-         (rune >= 0xA720 && rune <= 0xA7FF) || // Latin Extended-D
+-         (rune >= 0xAB30 && rune <= 0xAB6F);    // Latin Extended-E
++      (rune >= 0x0061 && rune <= 0x007A) || // a-z
++      (rune >= 0x00C0 && rune <= 0x024F) || // Latin Supplement + Extended
++      (rune >= 0x1E00 && rune <= 0x1EFF) || // Latin Extended Additional
++      (rune >= 0x2C60 && rune <= 0x2C7F) || // Latin Extended-C
++      (rune >= 0xA720 && rune <= 0xA7FF) || // Latin Extended-D
++      (rune >= 0xAB30 && rune <= 0xAB6F); // Latin Extended-E
+ }
+ 
+ // Reused across calls: direction detection runs on every keystroke and every
+@@ -160,100 +163,46 @@ class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
+       previous: _detectedDirection,
+     );
+     if (newDir != _detectedDirection) {
+-      setState(() { _detectedDirection = newDir; });
++      setState(() {
++        _detectedDirection = newDir;
++      });
+     }
+   }
+ 
+-  Future<void> _onTapLink(String text, String? href, String title) async {
+-    if (href == null) return;
+-    final uri = Uri.tryParse(href);
+-    if (uri == null) return;
+-    if (await canLaunchUrl(uri)) {
+-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+-    }
+-  }
++  /// Delegates to [handleMarkdownLinkTap] so link-tap behavior stays
++  /// in one place (shared with MarkdownView). [context] is the
++  /// State's own context, used by the confirmation dialog.
++  Future<void> _onTapLink(String text, String? href, String title) =>
++      handleMarkdownLinkTap(context, href);
+ 
++  /// Builds the [MarkdownStyleSheet] via the shared helper, with the
++  /// blockquote accent bar placed on the reading-start side for the
++  /// currently-detected [direction].
+   MarkdownStyleSheet _buildStyleSheet(
+     BuildContext context,
+     TextDirection direction,
+   ) {
+-    final theme = Theme.of(context);
+-    final colorScheme = theme.colorScheme;
++    final colorScheme = Theme.of(context).colorScheme;
+     final accentSide = BorderSide(color: colorScheme.primary, width: 4);
+-
+-    return MarkdownStyleSheet.fromTheme(theme).copyWith(
+-      h1: theme.textTheme.headlineMedium?.copyWith(
+-            fontSize: 24,
+-            fontWeight: FontWeight.bold,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+-      h2: theme.textTheme.titleLarge?.copyWith(
+-            fontSize: 22,
+-            fontWeight: FontWeight.w600,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+-      h3: theme.textTheme.titleMedium?.copyWith(
+-            fontSize: 20,
+-            fontWeight: FontWeight.w500,
+-            color: colorScheme.onSurface,
+-          ) ??
+-          const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+-      code: TextStyle(
+-        fontFamily: 'monospace',
+-        fontSize: 14,
+-        backgroundColor: colorScheme.surfaceContainerHighest,
+-        color: colorScheme.onSurface,
+-      ),
+-      codeblockPadding: const EdgeInsets.all(16),
+-      codeblockDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerHighest,
+-        borderRadius: BorderRadius.circular(8),
+-      ),
+-      a: TextStyle(
+-        color: colorScheme.primary,
+-        decoration: TextDecoration.underline,
+-      ),
+-      blockquote: TextStyle(
+-        fontStyle: FontStyle.italic,
+-        color: colorScheme.onSurfaceVariant,
+-      ),
+-      blockquotePadding: const EdgeInsets.symmetric(
+-        horizontal: 16,
+-        vertical: 8,
+-      ),
+-      blockquoteDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerLow,
+-        borderRadius: BorderRadius.circular(4),
+-        // Accent bar sits on the reading-start side of the quote.
+-        border: direction == TextDirection.rtl
+-            ? Border(right: accentSide)
+-            : Border(left: accentSide),
+-      ),
+-      tableBorder: TableBorder.all(
+-        color: colorScheme.outlineVariant,
+-        width: 1,
+-        borderRadius: BorderRadius.circular(4),
+-      ),
+-      tableHeadCellsPadding: const EdgeInsets.all(12),
+-      tableCellsPadding: const EdgeInsets.all(12),
+-      tableHeadCellsDecoration: BoxDecoration(
+-        color: colorScheme.surfaceContainerHigh,
+-      ),
+-      listBullet: TextStyle(color: colorScheme.primary),
++    final blockquoteBorder = direction == TextDirection.rtl
++        ? Border(right: accentSide)
++        : Border(left: accentSide);
++    return buildBaseMarkdownStyleSheet(
++      context,
++      blockquoteBorder: blockquoteBorder,
+     );
+   }
+ 
+   @override
+   Widget build(BuildContext context) {
+     if (widget.isLoading) {
+-      return const Center(
+-        child: CircularProgressIndicator(),
+-      );
++      return const Center(child: CircularProgressIndicator());
+     }
+ 
+-    final direction = _detectedDirection ?? Directionality.maybeOf(context) ?? TextDirection.ltr;
++    final direction =
++        _detectedDirection ??
++        Directionality.maybeOf(context) ??
++        TextDirection.ltr;
+ 
+     final styleSheet = _buildStyleSheet(context, direction);
+ 
+@@ -268,7 +217,8 @@ class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
+         // Fenced code blocks are code: force LTR base direction so mixed
+         // Latin/symbol content inside an RTL document keeps its logical order.
+         'pre': _LtrCodeBlockBuilder(
+-          codeStyle: styleSheet.code ??
++          codeStyle:
++              styleSheet.code ??
+               const TextStyle(fontFamily: 'monospace', fontSize: 14),
+           background: Theme.of(context).colorScheme.surfaceContainerHighest,
+           padding: styleSheet.codeblockPadding ?? const EdgeInsets.all(16),

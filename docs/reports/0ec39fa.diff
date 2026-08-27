@@ -1,0 +1,1259 @@
+commit 0ec39fa3c03b5b87dab410dc3a2ed1b63ee84ec5
+Author: Digital Trekkerr <support@digitaltrekkerr.com>
+Date:   Wed Aug 26 17:18:36 2026 +0300
+
+    Drop maxOutputWords, fix Gemini HTTP 400, restore built-in prompts, theme overlay
+    
+    Three user-visible fixes + one cleanup:
+    
+    • Drop maxOutputWords entirely
+      - Removes the field from PromptTemplate and TranslationRequest, the
+        max_tokens/maxOutputTokens lines from Gemini, OpenAI-compatible and
+        OpenRouter providers, the editor UI, and the ARB keys.
+      - The settings-level INPUT word limit (word_limitProvider) stays — that's
+        the user-controlled cap on how much text is sent.
+      - Providers no longer impose an output cap at all; the API uses its own
+        default. gpt-5.x, OpenRouter free tier, and similar models that reject
+        'max_tokens' now stop erroring.
+      - Tests verify the absence of 'max_tokens' / 'maxOutputTokens' on the wire
+        and that legacy JSON still loads (PromptTemplate.fromJson ignores the
+        old 'maxOutputWords' key).
+    
+    • Fix Gemini HTTP 400 on non-thinking models
+      - GeminiProvider previously sent 'thinkingConfig' to every Gemini model.
+        Models outside the 2.5/3 family (e.g. Gemini 1.5, 2.0, Gemma) reject
+        it with 400.
+      - New _supportsThinkingConfig(model) helper matches '^gemini-(2\.5|3)'.
+        thinkingConfig is only attached for those families. Restores the
+        pre-V2 wire format that worked.
+    
+    • Fix template editor's 'Reset to Default'
+      - The button used a hard-coded generic short prompt instead of the
+        template's actual built-in prompt (e.g. the full Gemini Reconstruction
+        formatting prompt was lost).
+      - SettingsRepository now exposes builtInSystemPromptFor(id) and the
+        built-in name list. The editor calls it for built-in templates; custom
+        templates still reset to the local default.
+      - 4 new tests cover the catalog and the unknown-id fallback.
+    
+    • Overlay theming follows app theme
+      - The overlay is a separate Flutter engine with its own MaterialApp.
+        Previously hardcoded ThemeData.dark() and 5 dark palette constants.
+      - Now reads SharedPreferences 'theme_mode' (new public
+        SettingsRepository.themeModeKey) and builds light/dark themes from the
+        same #4F46E5 seed as the main app. The 5 palette constants became
+        context-driven getters (Theme.of(context).colorScheme.{primary,
+        surface, surfaceContainer, onSurface, onSurfaceVariant}).
+      - Falls back to dark on absence or error to preserve historical look.
+    
+    Build: 0.1.5+2010 → 0.1.5+2011
+    Tests: 289/289 passing across all packages (151 translation_core,
+           52 translation_app, 52 file_handler, 23 markdown_renderer,
+           11 history).
+
+diff --git a/packages/translation_core/lib/src/models/prompt_template.dart b/packages/translation_core/lib/src/models/prompt_template.dart
+index 76a1946..b8d3799 100644
+--- a/packages/translation_core/lib/src/models/prompt_template.dart
++++ b/packages/translation_core/lib/src/models/prompt_template.dart
+@@ -59,10 +59,6 @@ class PromptTemplate extends Equatable {
+   /// Defaults to `false` for predictable capture/share flows.
+   final bool stream;
+ 
+-  /// Maximum desired output word count for translations produced by this
+-  /// template. Defaults to `10000` to match the global app default.
+-  final int maxOutputWords;
+-
+   /// Creates a [PromptTemplate].
+   const PromptTemplate({
+     required this.id,
+@@ -76,7 +72,6 @@ class PromptTemplate extends Equatable {
+     this.outputLanguageFixed = false,
+     this.enableThinking = false,
+     this.stream = false,
+-    this.maxOutputWords = 10000,
+   });
+ 
+   /// Creates a [PromptTemplate] from a JSON map.
+@@ -97,7 +92,6 @@ class PromptTemplate extends Equatable {
+       outputLanguageFixed: json['outputLanguageFixed'] as bool? ?? false,
+       enableThinking: json['enableThinking'] as bool? ?? false,
+       stream: json['stream'] as bool? ?? false,
+-      maxOutputWords: json['maxOutputWords'] as int? ?? 10000,
+     );
+   }
+ 
+@@ -115,7 +109,6 @@ class PromptTemplate extends Equatable {
+       'outputLanguageFixed': outputLanguageFixed,
+       'enableThinking': enableThinking,
+       'stream': stream,
+-      'maxOutputWords': maxOutputWords,
+     };
+   }
+ 
+@@ -132,7 +125,6 @@ class PromptTemplate extends Equatable {
+     bool? outputLanguageFixed,
+     bool? enableThinking,
+     bool? stream,
+-    int? maxOutputWords,
+   }) {
+     return PromptTemplate(
+       id: id ?? this.id,
+@@ -147,7 +139,6 @@ class PromptTemplate extends Equatable {
+       outputLanguageFixed: outputLanguageFixed ?? this.outputLanguageFixed,
+       enableThinking: enableThinking ?? this.enableThinking,
+       stream: stream ?? this.stream,
+-      maxOutputWords: maxOutputWords ?? this.maxOutputWords,
+     );
+   }
+ 
+@@ -164,6 +155,5 @@ class PromptTemplate extends Equatable {
+     outputLanguageFixed,
+     enableThinking,
+     stream,
+-    maxOutputWords,
+   ];
+ }
+diff --git a/packages/translation_core/lib/src/models/translation_request.dart b/packages/translation_core/lib/src/models/translation_request.dart
+index b713c3c..b8e05cf 100644
+--- a/packages/translation_core/lib/src/models/translation_request.dart
++++ b/packages/translation_core/lib/src/models/translation_request.dart
+@@ -78,14 +78,6 @@ class TranslationRequest extends Equatable {
+   /// providers ignore it.
+   final bool stream;
+ 
+-  /// Maximum desired output word count.
+-  ///
+-  /// Providers translate this into the appropriate `max_tokens` /
+-  /// `maxOutputTokens` parameter (using a ~2× token-to-word safety
+-  /// multiplier to cover both English and Arabic content). Defaults to
+-  /// `10000` to match the global app default.
+-  final int maxOutputWords;
+-
+   /// Creates a [TranslationRequest].
+   ///
+   /// Only [inputText] and [targetLanguage] are required; all other fields
+@@ -102,7 +94,6 @@ class TranslationRequest extends Equatable {
+     this.substituteTargetLanguage = true,
+     this.enableThinking = false,
+     this.stream = false,
+-    this.maxOutputWords = 10000,
+   }) : assert(
+          inputText != '' || imageBase64 != null,
+          'inputText must not be empty unless imageBase64 is provided',
+@@ -125,7 +116,6 @@ class TranslationRequest extends Equatable {
+           json['substituteTargetLanguage'] as bool? ?? true,
+       enableThinking: json['enableThinking'] as bool? ?? false,
+       stream: json['stream'] as bool? ?? false,
+-      maxOutputWords: json['maxOutputWords'] as int? ?? 10000,
+     );
+   }
+ 
+@@ -143,7 +133,6 @@ class TranslationRequest extends Equatable {
+       'substituteTargetLanguage': substituteTargetLanguage,
+       'enableThinking': enableThinking,
+       'stream': stream,
+-      'maxOutputWords': maxOutputWords,
+     };
+   }
+ 
+@@ -164,7 +153,6 @@ class TranslationRequest extends Equatable {
+     bool? substituteTargetLanguage,
+     bool? enableThinking,
+     bool? stream,
+-    int? maxOutputWords,
+   }) {
+     return TranslationRequest(
+       inputText: inputText ?? this.inputText,
+@@ -185,7 +173,6 @@ class TranslationRequest extends Equatable {
+           substituteTargetLanguage ?? this.substituteTargetLanguage,
+       enableThinking: enableThinking ?? this.enableThinking,
+       stream: stream ?? this.stream,
+-      maxOutputWords: maxOutputWords ?? this.maxOutputWords,
+     );
+   }
+ 
+@@ -202,7 +189,6 @@ class TranslationRequest extends Equatable {
+         substituteTargetLanguage,
+         enableThinking,
+         stream,
+-        maxOutputWords,
+       ];
+ }
+ 
+diff --git a/packages/translation_core/lib/src/providers/gemini_provider.dart b/packages/translation_core/lib/src/providers/gemini_provider.dart
+index 854b5b3..8c44b17 100644
+--- a/packages/translation_core/lib/src/providers/gemini_provider.dart
++++ b/packages/translation_core/lib/src/providers/gemini_provider.dart
+@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
+ import '../exceptions/translation_exception.dart';
+ import '../models/translation_request.dart';
+ import '../models/translation_provider.dart';
++import '../utils/dio_factory.dart';
+ import '../utils/response_path_extractor.dart';
+ import '../utils/sse_parser.dart';
+ import '../utils/variable_substitutor.dart';
+@@ -51,7 +52,7 @@ class GeminiProvider implements TranslationProvider {
+     Dio? dio,
+     this.stream = true,
+     this.visionModel,
+-  }) : _dio = dio ?? Dio();
++  }) : _dio = dio ?? createTranslationDio();
+ 
+   String _buildEndpointUrl(String modelToUse) {
+     // Honor the per-request `stream` flag when set; fall back to the
+@@ -124,14 +125,13 @@ class GeminiProvider implements TranslationProvider {
+     String effectiveModel,
+     Map<String, dynamic> bodyJson,
+   ) async* {
+-    final ResponseBody responseBody;
++    final Response<ResponseBody> response;
+     try {
+-      final response = await _dio.post<ResponseBody>(
++      response = await _dio.post<ResponseBody>(
+         _buildEndpointUrl(effectiveModel),
+         data: bodyJson,
+         options: Options(headers: _headers, responseType: ResponseType.stream),
+       );
+-      responseBody = response.data!;
+     } on DioException catch (e) {
+       throw TranslationException(
+         e.message ?? 'HTTP request failed',
+@@ -139,6 +139,11 @@ class GeminiProvider implements TranslationProvider {
+       );
+     }
+ 
++    final responseBody = response.data;
++    if (responseBody == null) {
++      throw const TranslationException('Empty response body');
++    }
++
+     final parser = SSEParser(responsePath: _kGeminiResponsePath);
+ 
+     await for (final chunk in responseBody.stream.cast<List<int>>().transform(
+@@ -184,14 +189,14 @@ class GeminiProvider implements TranslationProvider {
+       substituteTargetLanguage: request.substituteTargetLanguage,
+     );
+     final generationConfig = <String, dynamic>{
+-      // Roughly 2× word-to-token safety multiplier so both English
+-      // (~0.75 token/word) and Arabic (~0.6 token/word) content fit.
+-      'maxOutputTokens': request.maxOutputWords * 2,
+-      // Disable thinking by default; allow opt-in via `enableThinking`.
+-      // `thinkingBudget=0` is honored by Gemini 2.5 Flash/Flash-Lite; on
+-      // Gemini 2.5 Pro thinking cannot be disabled — the provider layer
+-      // warns the UI when that combination occurs.
+-      'thinkingConfig': {'thinkingBudget': request.enableThinking ? -1 : 0},
++      // No output token cap is sent — the provider applies its own default.
++      // Thinking config is only attached when the model family supports
++      // it; sending `thinkingConfig` to models that don't (e.g. Gemini
++      // 1.5/2.0, Gemma) makes the API reject the request with HTTP 400.
++      if (_supportsThinkingConfig(model))
++        'thinkingConfig': {
++          'thinkingBudget': request.enableThinking ? -1 : 0,
++        },
+     };
+     return {
+       'systemInstruction': {
+@@ -211,6 +216,16 @@ class GeminiProvider implements TranslationProvider {
+     };
+   }
+ 
++  /// Heuristic: does this model accept `generationConfig.thinkingConfig`?
++  ///
++  /// Only the Gemini 2.5 and 3.x families understand thinking budgets;
++  /// older models (1.5, 2.0) and Gemma reject the unknown field with a
++  /// 400 error. When this returns `false` the field is omitted entirely
++  /// so the request stays valid across all models.
++  static bool _supportsThinkingConfig(String modelName) {
++    return RegExp(r'^gemini-(2\.5|3)').hasMatch(modelName.toLowerCase());
++  }
++
+   Map<String, dynamic> _buildVisionBody(TranslationRequest request) {
+     final resolvedPrompt = VariableSubstitutor.substituteMap(
+       request.systemPrompt,
+@@ -242,8 +257,12 @@ class GeminiProvider implements TranslationProvider {
+         },
+       ],
+       'generationConfig': {
+-        'maxOutputTokens': request.maxOutputWords * 2,
+-        'thinkingConfig': {'thinkingBudget': request.enableThinking ? -1 : 0},
++        if (_supportsThinkingConfig(
++          visionModel ?? model,
++        ))
++          'thinkingConfig': {
++            'thinkingBudget': request.enableThinking ? -1 : 0,
++          },
+       },
+     };
+   }
+diff --git a/packages/translation_core/lib/src/providers/openai_compatible_provider.dart b/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
+index 4e9640b..de3384f 100644
+--- a/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
++++ b/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
+@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
+ import '../exceptions/translation_exception.dart';
+ import '../models/translation_request.dart';
+ import '../models/translation_provider.dart';
++import '../utils/dio_factory.dart';
+ import '../utils/response_path_extractor.dart';
+ import '../utils/sse_parser.dart';
+ import '../utils/variable_substitutor.dart';
+@@ -41,7 +42,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
+     this.visionModel,
+     this.stream = true,
+     Dio? dio,
+-  }) : _dio = dio ?? Dio();
++  }) : _dio = dio ?? createTranslationDio();
+ 
+   String get _endpointUrl {
+     final base = baseUrl.endsWith('/')
+@@ -104,10 +105,11 @@ class OpenAICompatibleProvider implements TranslationProvider {
+       bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+     }
+ 
+-    // Per-request overrides: rewrite `stream`, add `max_tokens`, and attach
+-    // `reasoning_effort` on o-series-style models when thinking is enabled.
++    // Per-request overrides: rewrite `stream` and attach `reasoning_effort`
++    // on reasoning-capable models when thinking is enabled. No output token
++    // cap is sent — newer models (e.g. gpt-5.x) reject `max_tokens` with a
++    // 400 error, so the provider default applies instead.
+     bodyJson['stream'] = request.stream || stream;
+-    bodyJson['max_tokens'] = request.maxOutputWords * 2;
+     if (request.enableThinking && _supportsReasoningEffort(model)) {
+       bodyJson['reasoning_effort'] = 'low';
+     } else if (!request.enableThinking) {
+@@ -187,7 +189,6 @@ class OpenAICompatibleProvider implements TranslationProvider {
+         },
+       ],
+       'stream': request.stream || stream,
+-      'max_tokens': request.maxOutputWords * 2,
+     };
+     if (request.enableThinking && _supportsReasoningEffort(effectiveModel)) {
+       body['reasoning_effort'] = 'low';
+diff --git a/packages/translation_core/lib/src/providers/openrouter_provider.dart b/packages/translation_core/lib/src/providers/openrouter_provider.dart
+index 5dc8934..212876f 100644
+--- a/packages/translation_core/lib/src/providers/openrouter_provider.dart
++++ b/packages/translation_core/lib/src/providers/openrouter_provider.dart
+@@ -6,6 +6,7 @@ import '../exceptions/translation_exception.dart';
+ import '../models/provider_profile.dart';
+ import '../models/translation_request.dart';
+ import '../models/translation_provider.dart';
++import '../utils/dio_factory.dart';
+ import '../utils/sse_parser.dart';
+ import '../utils/variable_substitutor.dart';
+ 
+@@ -91,7 +92,7 @@ class OpenRouterProvider implements TranslationProvider {
+     this.stream = true,
+     this.model,
+     this.visionModel,
+-  }) : _dio = dio ?? Dio();
++  }) : _dio = dio ?? createTranslationDio();
+ 
+   /// Creates an [OpenRouterProvider] from a [ProviderProfile] and API key.
+   ///
+@@ -127,9 +128,14 @@ class OpenRouterProvider implements TranslationProvider {
+       );
+       final data = response.data as Map<String, dynamic>;
+       final models = data['data'] as List<dynamic>;
+-      return models.map((m) => (m as Map<String, dynamic>)['id'] as String).toList();
++      return models
++          .map((m) => (m as Map<String, dynamic>)['id'] as String)
++          .toList();
+     } on DioException catch (e) {
+-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
++      throw TranslationException(
++        e.message ?? 'Failed to fetch models',
++        statusCode: e.response?.statusCode,
++      );
+     } catch (e) {
+       throw TranslationException('Unexpected error fetching models: $e');
+     }
+@@ -166,11 +172,12 @@ class OpenRouterProvider implements TranslationProvider {
+       bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+     }
+ 
+-    // Per-request overrides: rewrite `stream`, add `max_tokens`, attach
+-    // `reasoning` when thinking is requested. These keep the public template
+-    // edit-free while honoring the new template-level toggles.
++    // Per-request overrides: rewrite `stream` and attach `reasoning` when
++    // thinking is requested. These keep the public template edit-free while
++    // honoring the template-level toggle. No output token cap is sent —
++    // oversized caps make some providers (e.g. free-tier models with small
++    // contexts) reject the request.
+     bodyJson['stream'] = request.stream || stream;
+-    bodyJson['max_tokens'] = request.maxOutputWords * 2;
+     if (request.enableThinking) {
+       bodyJson['reasoning'] = const {'effort': 'low'};
+     } else {
+@@ -251,7 +258,6 @@ class OpenRouterProvider implements TranslationProvider {
+         },
+       ],
+       'stream': request.stream || stream,
+-      'max_tokens': request.maxOutputWords * 2,
+     };
+     if (request.enableThinking) {
+       body['reasoning'] = const {'effort': 'low'};
+diff --git a/packages/translation_core/test/gemini_provider_test.dart b/packages/translation_core/test/gemini_provider_test.dart
+index 83d41ce..77573e6 100644
+--- a/packages/translation_core/test/gemini_provider_test.dart
++++ b/packages/translation_core/test/gemini_provider_test.dart
+@@ -253,8 +253,7 @@ void main() {
+           final request = TranslationRequest(
+             inputText: 'Hello',
+             targetLanguage: 'French',
+-            systemPrompt:
+-                'Translate to {{target_language}}.',
++            systemPrompt: 'Translate to {{target_language}}.',
+           );
+ 
+           await provider.translate(request).toList();
+@@ -600,5 +599,48 @@ void main() {
+         },
+       );
+     });
++
++    group('null response body', () {
++      test(
++        'throws TranslationException("Empty response body") on streaming null data',
++        () async {
++          final dio = Dio();
++          dio.interceptors.add(
++            InterceptorsWrapper(
++              onRequest: (options, handler) {
++                handler.resolve(
++                  Response<ResponseBody>(
++                    requestOptions: options,
++                    data: null,
++                    statusCode: 200,
++                  ),
++                );
++              },
++            ),
++          );
++
++          final provider = GeminiProvider(
++            apiKey: 'test-key',
++            model: 'gemini-2.5-flash',
++            dio: dio,
++          );
++          final request = TranslationRequest(
++            inputText: 'Hello',
++            targetLanguage: 'Spanish',
++          );
++
++          await expectLater(
++            provider.translate(request).toList(),
++            throwsA(
++              isA<TranslationException>().having(
++                (e) => e.message,
++                'message',
++                'Empty response body',
++              ),
++            ),
++          );
++        },
++      );
++    });
+   });
+ }
+diff --git a/packages/translation_core/test/openai_compatible_provider_test.dart b/packages/translation_core/test/openai_compatible_provider_test.dart
+index 4199dbd..a26b453 100644
+--- a/packages/translation_core/test/openai_compatible_provider_test.dart
++++ b/packages/translation_core/test/openai_compatible_provider_test.dart
+@@ -39,7 +39,7 @@ void main() {
+       capturedRequest = null;
+     });
+ 
+-    test('non-reasoning model — reasoning absent, stream false, max_tokens set',
++    test('non-reasoning model — reasoning absent, no max_tokens cap sent',
+         () async {
+       final dio = createMockStreamingDio();
+       final provider = OpenAICompatibleProvider(
+@@ -65,7 +65,8 @@ void main() {
+       // provider default stream=true; request default stream=false →
+       // the wire value is true until the caller explicitly disables streaming.
+       expect(body['stream'], isTrue);
+-      expect(body['max_tokens'], 20000);
++      // No output token cap is sent — gpt-5.x rejects `max_tokens` with 400.
++      expect(body.containsKey('max_tokens'), isFalse);
+     });
+ 
+     test('o-series model — enableThinking attaches reasoning_effort=low',
+@@ -142,7 +143,7 @@ void main() {
+       expect(body['stream'], isTrue);
+     });
+ 
+-    test('custom maxOutputWords scales to max_tokens*2', () async {
++    test('no max_tokens key regardless of request', () async {
+       final dio = createMockStreamingDio();
+       final provider = OpenAICompatibleProvider(
+         apiKey: 'k',
+@@ -157,13 +158,13 @@ void main() {
+               inputText: 'Hello',
+               targetLanguage: 'Arabic',
+               systemPrompt: 'Translate.',
+-              maxOutputWords: 3000,
+             ),
+           )
+           .toList();
+ 
+       final body = capturedRequest!.data as Map<String, dynamic>;
+-      expect(body['max_tokens'], 6000);
++      expect(body.containsKey('max_tokens'), isFalse,
++          reason: 'output caps were removed — providers use their defaults');
+     });
+   });
+ }
+\ No newline at end of file
+diff --git a/packages/translation_core/test/openrouter_provider_test.dart b/packages/translation_core/test/openrouter_provider_test.dart
+index bfca02f..109d407 100644
+--- a/packages/translation_core/test/openrouter_provider_test.dart
++++ b/packages/translation_core/test/openrouter_provider_test.dart
+@@ -39,7 +39,7 @@ void main() {
+       capturedRequest = null;
+     });
+ 
+-    test('default request — reasoning absent, stream false, max_tokens set',
++    test('default request — reasoning absent, no max_tokens cap sent',
+         () async {
+       final dio = createMockStreamingDio();
+       final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
+@@ -62,8 +62,9 @@ void main() {
+       // caller explicitly disables streaming.
+       expect(body['stream'], isTrue,
+           reason: 'provider default stream=true, request default stream=false');
+-      expect(body['max_tokens'], 20000,
+-          reason: 'maxOutputWords=10000 → max_tokens=20000');
++      // No output token cap is sent — oversized caps get rejected by
++      // free-tier models with small contexts.
++      expect(body.containsKey('max_tokens'), isFalse);
+     });
+ 
+     test('enableThinking=true attaches reasoning.effort=low', () async {
+@@ -105,7 +106,7 @@ void main() {
+       expect(body['stream'], isTrue);
+     });
+ 
+-    test('custom maxOutputWords scales to max_tokens*2', () async {
++    test('no max_tokens key regardless of request', () async {
+       final dio = createMockStreamingDio();
+       final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
+ 
+@@ -115,13 +116,13 @@ void main() {
+               inputText: 'Hello',
+               targetLanguage: 'Arabic',
+               systemPrompt: 'Translate.',
+-              maxOutputWords: 2500,
+             ),
+           )
+           .toList();
+ 
+       final body = capturedRequest!.data as Map<String, dynamic>;
+-      expect(body['max_tokens'], 5000);
++      expect(body.containsKey('max_tokens'), isFalse,
++          reason: 'output caps were removed — providers use their defaults');
+     });
+   });
+ }
+\ No newline at end of file
+diff --git a/packages/translation_core/test/prompt_template_test.dart b/packages/translation_core/test/prompt_template_test.dart
+index a1401f5..662c1b9 100644
+--- a/packages/translation_core/test/prompt_template_test.dart
++++ b/packages/translation_core/test/prompt_template_test.dart
+@@ -259,22 +259,20 @@ void main() {
+         expect(roundTripped, equals(imageTemplate));
+       });
+ 
+-      test('round-trip preserves enableThinking/stream/maxOutputWords', () {
++      test('round-trip preserves enableThinking/stream', () {
+         final original = textTemplate.copyWith(
+           enableThinking: true,
+           stream: true,
+-          maxOutputWords: 7500,
+         );
+         final roundTripped = PromptTemplate.fromJson(original.toJson());
+         expect(roundTripped.enableThinking, isTrue);
+         expect(roundTripped.stream, isTrue);
+-        expect(roundTripped.maxOutputWords, 7500);
+         expect(roundTripped, equals(original));
+       });
+     });
+ 
+-    group('new fields — enableThinking / stream / maxOutputWords', () {
+-      test('defaults are false / false / 10000', () {
++    group('new fields — enableThinking / stream', () {
++      test('defaults are false / false', () {
+         final template = PromptTemplate(
+           id: 'tpl-new',
+           profileId: 'pid',
+@@ -285,7 +283,6 @@ void main() {
+         );
+         expect(template.enableThinking, isFalse);
+         expect(template.stream, isFalse);
+-        expect(template.maxOutputWords, 10000);
+       });
+ 
+       test(
+@@ -298,12 +295,11 @@ void main() {
+             'systemPrompt': 'Prompt',
+             'supportsText': true,
+             'supportsImage': false,
+-            // No enableThinking / stream / maxOutputWords keys.
++            // No enableThinking / stream keys.
+           };
+           final template = PromptTemplate.fromJson(json);
+           expect(template.enableThinking, isFalse);
+           expect(template.stream, isFalse);
+-          expect(template.maxOutputWords, 10000);
+         },
+       );
+ 
+@@ -317,12 +313,12 @@ void main() {
+           'supportsImage': false,
+           'enableThinking': true,
+           'stream': true,
++          // Legacy key from older app versions — must be ignored.
+           'maxOutputWords': 5000,
+         };
+         final template = PromptTemplate.fromJson(json);
+         expect(template.enableThinking, isTrue);
+         expect(template.stream, isTrue);
+-        expect(template.maxOutputWords, 5000);
+       });
+ 
+       test('fromJson coerces null new fields to defaults (defensive)', () {
+@@ -340,39 +336,34 @@ void main() {
+         final template = PromptTemplate.fromJson(json);
+         expect(template.enableThinking, isFalse);
+         expect(template.stream, isFalse);
+-        expect(template.maxOutputWords, 10000);
+       });
+ 
+       test('toJson includes new fields', () {
+         final template = textTemplate.copyWith(
+           enableThinking: true,
+           stream: true,
+-          maxOutputWords: 20000,
+         );
+         final json = template.toJson();
+         expect(json.containsKey('enableThinking'), isTrue);
+         expect(json.containsKey('stream'), isTrue);
+-        expect(json.containsKey('maxOutputWords'), isTrue);
+         expect(json['enableThinking'], isTrue);
+         expect(json['stream'], isTrue);
+-        expect(json['maxOutputWords'], 20000);
++        // The removed word-limit key must never be written back.
++        expect(json.containsKey('maxOutputWords'), isFalse);
+       });
+ 
+       test('copyWith preserves unspecified new fields', () {
+         final enriched = textTemplate.copyWith(
+           enableThinking: true,
+           stream: true,
+-          maxOutputWords: 3000,
+         );
+         final renamed = enriched.copyWith(name: 'Renamed');
+         expect(renamed.enableThinking, isTrue);
+         expect(renamed.stream, isTrue);
+-        expect(renamed.maxOutputWords, 3000);
+         expect(renamed.name, 'Renamed');
+         // Original untouched.
+         expect(textTemplate.enableThinking, isFalse);
+         expect(textTemplate.stream, isFalse);
+-        expect(textTemplate.maxOutputWords, 10000);
+       });
+ 
+       test('props distinguish templates by new fields', () {
+@@ -383,10 +374,6 @@ void main() {
+         final c = textTemplate.copyWith(stream: true);
+         final d = textTemplate.copyWith(stream: false);
+         expect(c, isNot(equals(d)));
+-
+-        final e = textTemplate.copyWith(maxOutputWords: 1000);
+-        final f = textTemplate.copyWith(maxOutputWords: 2000);
+-        expect(e, isNot(equals(f)));
+       });
+     });
+   });
+diff --git a/translation_app/lib/l10n/app_ar.arb b/translation_app/lib/l10n/app_ar.arb
+index 3590e78..88dfb97 100644
+--- a/translation_app/lib/l10n/app_ar.arb
++++ b/translation_app/lib/l10n/app_ar.arb
+@@ -861,10 +861,10 @@
+ 
+   "tplAdvancedTitle": "إعدادات متقدمة",
+   "@tplAdvancedTitle": {
+-    "description": "عنوان القسم القابل للطي في محرر القالب لإعدادات التفكير والبث وحد الكلمات."
++    "description": "عنوان القسم القابل للطي في محرر القالب لإعدادات التفكير والبث."
+   },
+ 
+-  "tplAdvancedSubtitle": "اضبط التفكير والبث وحد المخرجات لهذا القالب.",
++  "tplAdvancedSubtitle": "اضبط التفكير والبث لهذا القالب.",
+   "@tplAdvancedSubtitle": {
+     "description": "وصف مختصر تحت عنوان القسم المتقدم."
+   },
+@@ -887,15 +887,5 @@
+   "tplEnableStreamSubtitle": "عند التعطيل، تُعاد الترجمة كاملة دفعة واحدة (أسهل للنسخ/المشاركة).",
+   "@tplEnableStreamSubtitle": {
+     "description": "نص مساعد تحت مفتاح تفعيل البث."
+-  },
+-
+-  "tplMaxOutputWordsLabel": "الحد الأقصى لعدد الكلمات",
+-  "@tplMaxOutputWordsLabel": {
+-    "description": "تسمية حقل رقمي يحدّ من الحد الأقصى لعدد كلمات الترجمة."
+-  },
+-
+-  "tplMaxOutputWordsHelper": "الافتراضي 10000. يحوّل المزود هذا الرقم إلى ميزانية توكنز (×2 تقريبًا).",
+-  "@tplMaxOutputWordsHelper": {
+-    "description": "نص مساعد تحت حقل الحد الأقصى للكلمات يوضح الافتراضي ومعامل التحويل."
+   }
+ }
+diff --git a/translation_app/lib/l10n/app_en.arb b/translation_app/lib/l10n/app_en.arb
+index 84f12fb..fc0dcde 100644
+--- a/translation_app/lib/l10n/app_en.arb
++++ b/translation_app/lib/l10n/app_en.arb
+@@ -861,10 +861,10 @@
+ 
+   "tplAdvancedTitle": "Advanced",
+   "@tplAdvancedTitle": {
+-    "description": "Title of the collapsible advanced section in the template editor (model reasoning, streaming, word cap)."
++    "description": "Title of the collapsible advanced section in the template editor (model reasoning, streaming)."
+   },
+ 
+-  "tplAdvancedSubtitle": "Tune reasoning, streaming and output limits for this template.",
++  "tplAdvancedSubtitle": "Tune reasoning and streaming for this template.",
+   "@tplAdvancedSubtitle": {
+     "description": "Subtitle of the advanced section header."
+   },
+@@ -887,15 +887,5 @@
+   "tplEnableStreamSubtitle": "When off, the full translation is returned at once (easier to copy/share).",
+   "@tplEnableStreamSubtitle": {
+     "description": "Helper text under the enable-stream switch."
+-  },
+-
+-  "tplMaxOutputWordsLabel": "Max output words",
+-  "@tplMaxOutputWordsLabel": {
+-    "description": "Label of the number field that caps the maximum output word count for a translation."
+-  },
+-
+-  "tplMaxOutputWordsHelper": "Default 10000. Providers translate this into a token budget (~2×).",
+-  "@tplMaxOutputWordsHelper": {
+-    "description": "Helper text under the max-output-words field explaining the default and conversion."
+   }
+ }
+diff --git a/translation_app/lib/l10n/app_localizations.dart b/translation_app/lib/l10n/app_localizations.dart
+index da29517..c180e37 100644
+--- a/translation_app/lib/l10n/app_localizations.dart
++++ b/translation_app/lib/l10n/app_localizations.dart
+@@ -1070,7 +1070,7 @@ abstract class AppLocalizations {
+   /// **'Share options'**
+   String get shareOptionsTitle;
+ 
+-  /// Title of the collapsible advanced section in the template editor (model reasoning, streaming, word cap).
++  /// Title of the collapsible advanced section in the template editor (model reasoning, streaming).
+   ///
+   /// In en, this message translates to:
+   /// **'Advanced'**
+@@ -1079,7 +1079,7 @@ abstract class AppLocalizations {
+   /// Subtitle of the advanced section header.
+   ///
+   /// In en, this message translates to:
+-  /// **'Tune reasoning, streaming and output limits for this template.'**
++  /// **'Tune reasoning and streaming for this template.'**
+   String get tplAdvancedSubtitle;
+ 
+   /// Switch to enable model reasoning/thinking for this template. Defaults off.
+@@ -1105,18 +1105,6 @@ abstract class AppLocalizations {
+   /// In en, this message translates to:
+   /// **'When off, the full translation is returned at once (easier to copy/share).'**
+   String get tplEnableStreamSubtitle;
+-
+-  /// Label of the number field that caps the maximum output word count for a translation.
+-  ///
+-  /// In en, this message translates to:
+-  /// **'Max output words'**
+-  String get tplMaxOutputWordsLabel;
+-
+-  /// Helper text under the max-output-words field explaining the default and conversion.
+-  ///
+-  /// In en, this message translates to:
+-  /// **'Default 10000. Providers translate this into a token budget (~2×).'**
+-  String get tplMaxOutputWordsHelper;
+ }
+ 
+ class _AppLocalizationsDelegate
+diff --git a/translation_app/lib/l10n/app_localizations_ar.dart b/translation_app/lib/l10n/app_localizations_ar.dart
+index 6eed7a1..9929c56 100644
+--- a/translation_app/lib/l10n/app_localizations_ar.dart
++++ b/translation_app/lib/l10n/app_localizations_ar.dart
+@@ -559,8 +559,7 @@ class AppLocalizationsAr extends AppLocalizations {
+   String get tplAdvancedTitle => 'إعدادات متقدمة';
+ 
+   @override
+-  String get tplAdvancedSubtitle =>
+-      'اضبط التفكير والبث وحد المخرجات لهذا القالب.';
++  String get tplAdvancedSubtitle => 'اضبط التفكير والبث لهذا القالب.';
+ 
+   @override
+   String get tplEnableThinkingTitle => 'تفعيل التفكير';
+@@ -575,11 +574,4 @@ class AppLocalizationsAr extends AppLocalizations {
+   @override
+   String get tplEnableStreamSubtitle =>
+       'عند التعطيل، تُعاد الترجمة كاملة دفعة واحدة (أسهل للنسخ/المشاركة).';
+-
+-  @override
+-  String get tplMaxOutputWordsLabel => 'الحد الأقصى لعدد الكلمات';
+-
+-  @override
+-  String get tplMaxOutputWordsHelper =>
+-      'الافتراضي 10000. يحوّل المزود هذا الرقم إلى ميزانية توكنز (×2 تقريبًا).';
+ }
+diff --git a/translation_app/lib/l10n/app_localizations_en.dart b/translation_app/lib/l10n/app_localizations_en.dart
+index afc8b84..698e1b2 100644
+--- a/translation_app/lib/l10n/app_localizations_en.dart
++++ b/translation_app/lib/l10n/app_localizations_en.dart
+@@ -557,7 +557,7 @@ class AppLocalizationsEn extends AppLocalizations {
+ 
+   @override
+   String get tplAdvancedSubtitle =>
+-      'Tune reasoning, streaming and output limits for this template.';
++      'Tune reasoning and streaming for this template.';
+ 
+   @override
+   String get tplEnableThinkingTitle => 'Enable thinking';
+@@ -572,11 +572,4 @@ class AppLocalizationsEn extends AppLocalizations {
+   @override
+   String get tplEnableStreamSubtitle =>
+       'When off, the full translation is returned at once (easier to copy/share).';
+-
+-  @override
+-  String get tplMaxOutputWordsLabel => 'Max output words';
+-
+-  @override
+-  String get tplMaxOutputWordsHelper =>
+-      'Default 10000. Providers translate this into a token budget (~2×).';
+ }
+diff --git a/translation_app/lib/main.dart b/translation_app/lib/main.dart
+index 2f11870..6017b78 100644
+--- a/translation_app/lib/main.dart
++++ b/translation_app/lib/main.dart
+@@ -52,6 +52,39 @@ void overlayMain() {
+   runApp(const _OverlayApp());
+ }
+ 
++/// Builds the overlay's [ThemeData] for a given brightness, mirroring the
++/// main app's themes (same seed + Material 3) so the floating window's
++/// colors follow the app's light/dark mode.
++ThemeData _overlayTheme(Brightness brightness) {
++  return ThemeData(
++    colorScheme: ColorScheme.fromSeed(
++      seedColor: _kSeedColor,
++      brightness: brightness,
++    ),
++    useMaterial3: true,
++  );
++}
++
++Future<ThemeMode> _resolveOverlayThemeMode() async {
++  try {
++    final prefs = await SharedPreferences.getInstance();
++    final raw = prefs.getString(SettingsRepository.themeModeKey);
++    switch (raw) {
++      case 'light':
++        return ThemeMode.light;
++      case 'dark':
++        return ThemeMode.dark;
++      default:
++        // Absent value → keep the historical always-dark look.
++        return ThemeMode.dark;
++    }
++  } catch (e) {
++    debugPrint('[OverlayMain] Failed to read theme mode, falling back to '
++        'dark: $e');
++    return ThemeMode.dark;
++  }
++}
++
+ class _OverlayApp extends StatelessWidget {
+   const _OverlayApp();
+ 
+@@ -59,28 +92,36 @@ class _OverlayApp extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    return MaterialApp(
+-      debugShowCheckedModeBanner: false,
+-      theme: ThemeData.dark(),
+-      localizationsDelegates: const [
+-        GlobalMaterialLocalizations.delegate,
+-        GlobalWidgetsLocalizations.delegate,
+-        GlobalCupertinoLocalizations.delegate,
+-      ],
+-      supportedLocales: const [Locale('en', '')],
+-      home: PopScope(
+-        canPop: false,
+-        onPopInvokedWithResult: (didPop, result) async {
+-          if (!didPop) {
+-            try {
+-              await _overlayChannel.invokeMethod('close');
+-            } catch (e) {
+-              debugPrint('[Overlay] Close error: $e');
+-            }
+-          }
+-        },
+-        child: const _TranslatorOverlayContent(),
+-      ),
++    return FutureBuilder<ThemeMode>(
++      future: _resolveOverlayThemeMode(),
++      builder: (context, snapshot) {
++        final themeMode = snapshot.data ?? ThemeMode.dark;
++        return MaterialApp(
++          debugShowCheckedModeBanner: false,
++          theme: _overlayTheme(Brightness.light),
++          darkTheme: _overlayTheme(Brightness.dark),
++          themeMode: themeMode,
++          localizationsDelegates: const [
++            GlobalMaterialLocalizations.delegate,
++            GlobalWidgetsLocalizations.delegate,
++            GlobalCupertinoLocalizations.delegate,
++          ],
++          supportedLocales: const [Locale('en', '')],
++          home: PopScope(
++            canPop: false,
++            onPopInvokedWithResult: (didPop, result) async {
++              if (!didPop) {
++                try {
++                  await _overlayChannel.invokeMethod('close');
++                } catch (e) {
++                  debugPrint('[Overlay] Close error: $e');
++                }
++              }
++            },
++            child: const _TranslatorOverlayContent(),
++          ),
++        );
++      },
+     );
+   }
+ }
+@@ -104,11 +145,16 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   TextDirection _inputDirection = TextDirection.ltr;
+   bool _showCopiedFeedback = false;
+ 
+-  static const Color _primaryColor = Color(0xFF4F46E5);
+-  static const Color _surfaceColor = Color(0xFF1E1E2E);
+-  static const Color _surfaceContainerColor = Color(0xFF2D2D3D);
+-  static const Color _onSurfaceColor = Colors.white;
+-  static const Color _onSurfaceVariantColor = Color(0xFFB0B0C0);
++  // Overlay palette resolved from the ambient theme so the floating window
++  // follows the app's light/dark mode (previously hardcoded dark values).
++  // Instance getters over [State.context] — valid during build only.
++  Color get _primaryColor => Theme.of(context).colorScheme.primary;
++  Color get _surfaceColor => Theme.of(context).colorScheme.surface;
++  Color get _surfaceContainerColor =>
++      Theme.of(context).colorScheme.surfaceContainer;
++  Color get _onSurfaceColor => Theme.of(context).colorScheme.onSurface;
++  Color get _onSurfaceVariantColor =>
++      Theme.of(context).colorScheme.onSurfaceVariant;
+ 
+   StreamSubscription<dynamic>? _overlaySubscription;
+   bool _isCancelled = false;
+@@ -583,7 +629,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+               ),
+               child: Text(
+                 message,
+-                style: const TextStyle(color: _onSurfaceColor, fontSize: 14),
++                style: TextStyle(color: _onSurfaceColor, fontSize: 14),
+               ),
+             ),
+           ),
+@@ -879,7 +925,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                     textAlign: _inputDirection == TextDirection.rtl
+                         ? TextAlign.right
+                         : TextAlign.left,
+-                    style: const TextStyle(
++                    style: TextStyle(
+                       color: _onSurfaceColor,
+                       fontSize: 14,
+                     ),
+@@ -891,7 +937,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                     },
+                     decoration: InputDecoration(
+                       hintText: 'Paste or enter text...',
+-                      hintStyle: const TextStyle(color: _onSurfaceVariantColor),
++                      hintStyle: TextStyle(color: _onSurfaceVariantColor),
+                       filled: true,
+                       fillColor: _surfaceContainerColor,
+                       border: OutlineInputBorder(
+@@ -1020,8 +1066,8 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                             color: _onSurfaceVariantColor,
+                           ),
+                           if (_showCopiedFeedback)
+-                            const Padding(
+-                              padding: EdgeInsets.symmetric(horizontal: 12),
++                            Padding(
++                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                               child: Text(
+                                 'Copied!',
+                                 style: TextStyle(
+@@ -1159,7 +1205,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+               padding: const EdgeInsets.all(16),
+               child: Row(
+                 children: [
+-                  const Text(
++                  Text(
+                     'Select Language',
+                     style: TextStyle(
+                       color: _onSurfaceColor,
+@@ -1169,7 +1215,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                   ),
+                   const Spacer(),
+                   IconButton(
+-                    icon: const Icon(Icons.close, color: _onSurfaceColor),
++                    icon: Icon(Icons.close, color: _onSurfaceColor),
+                     onPressed: () => Navigator.of(ctx).pop(),
+                   ),
+                 ],
+@@ -1217,9 +1263,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   Widget _buildHeader() {
+     return Row(
+       children: [
+-        const Icon(Icons.translate, color: _primaryColor, size: 24),
++        Icon(Icons.translate, color: _primaryColor, size: 24),
+         const SizedBox(width: 8),
+-        const Expanded(
++        Expanded(
+           child: Text(
+             'Translator',
+             style: TextStyle(
+@@ -1242,14 +1288,14 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+               children: [
+                 Text(
+                   _selectedLanguageCode.toUpperCase(),
+-                  style: const TextStyle(
++                  style: TextStyle(
+                     color: _onSurfaceColor,
+                     fontSize: 12,
+                     fontWeight: FontWeight.bold,
+                   ),
+                 ),
+                 const SizedBox(width: 4),
+-                const Icon(
++                Icon(
+                   Icons.arrow_drop_down,
+                   color: _onSurfaceColor,
+                   size: 16,
+@@ -1260,7 +1306,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+         ),
+         const SizedBox(width: 4),
+         IconButton(
+-          icon: const Icon(Icons.close, color: _onSurfaceColor, size: 20),
++          icon: Icon(Icons.close, color: _onSurfaceColor, size: 20),
+           onPressed: _handleClose,
+           padding: EdgeInsets.zero,
+           constraints: const BoxConstraints(),
+diff --git a/translation_app/lib/screens/template_edit_screen.dart b/translation_app/lib/screens/template_edit_screen.dart
+index 57b7dbc..0b8d665 100644
+--- a/translation_app/lib/screens/template_edit_screen.dart
++++ b/translation_app/lib/screens/template_edit_screen.dart
+@@ -4,6 +4,7 @@ import 'package:translation_core/translation_core.dart';
+ 
+ import '../l10n/app_localizations.dart';
+ import '../providers/settings_provider.dart';
++import '../services/settings_repository.dart';
+ 
+ /// Default system prompt used by the application.
+ const _kDefaultSystemPrompt =
+@@ -40,7 +41,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+   bool _outputLanguageFixed = false;
+   bool _enableThinking = false;
+   bool _stream = false;
+-  String _maxOutputWordsText = '10000';
+ 
+   /// Whether this is an edit of an existing template.
+   bool get _isEditing => widget.template != null;
+@@ -84,7 +84,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+     _outputLanguageFixed = template.outputLanguageFixed;
+     _enableThinking = template.enableThinking;
+     _stream = template.stream;
+-    _maxOutputWordsText = template.maxOutputWords.toString();
+   }
+ 
+   // ── Build ──────────────────────────────────────────────────────────
+@@ -212,19 +211,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+                 subtitle: Text(l10n.tplEnableStreamSubtitle),
+                 onChanged: (v) => setState(() => _stream = v),
+               ),
+-              Padding(
+-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+-                child: TextField(
+-                  keyboardType: TextInputType.number,
+-                  controller: TextEditingController(text: _maxOutputWordsText),
+-                  onChanged: (v) => _maxOutputWordsText = v,
+-                  decoration: InputDecoration(
+-                    labelText: l10n.tplMaxOutputWordsLabel,
+-                    helperText: l10n.tplMaxOutputWordsHelper,
+-                    border: const OutlineInputBorder(),
+-                  ),
+-                ),
+-              ),
+             ],
+           ),
+         ],
+@@ -243,7 +229,14 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+       !_systemPromptController.text.contains('{{target_language}}');
+ 
+   void _resetSystemPrompt() {
+-    _systemPromptController.text = _kDefaultSystemPrompt;
++    // For built-in templates, restore the template's OWN original prompt
++    // from the shipped catalog (what the user saw at first install), not a
++    // generic placeholder. Custom templates fall back to the generic one.
++    final template = widget.template;
++    final original = template == null
++        ? null
++        : SettingsRepository.builtInSystemPromptFor(template.id);
++    _systemPromptController.text = original ?? _kDefaultSystemPrompt;
+     setState(() {});
+   }
+ 
+@@ -296,7 +289,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+       outputLanguageFixed: _outputLanguageFixed,
+       enableThinking: _enableThinking,
+       stream: _stream,
+-      maxOutputWords: int.tryParse(_maxOutputWordsText) ?? 10000,
+       isBuiltIn: _isEditing ? widget.template!.isBuiltIn : false,
+     );
+ 
+diff --git a/translation_app/lib/services/settings_repository.dart b/translation_app/lib/services/settings_repository.dart
+index a43a520..131bf6d 100644
+--- a/translation_app/lib/services/settings_repository.dart
++++ b/translation_app/lib/services/settings_repository.dart
+@@ -72,7 +72,11 @@ class SettingsRepository {
+   static const _defaultTargetLanguageKey = 'default_target_language';
+   static const _wordLimitKey = 'word_limit';
+   static const _overlaySizeModeKey = 'overlay_size_mode';
+-  static const _themeModeKey = 'theme_mode';
++  /// SharedPreferences key storing the app [ThemeMode] name (`system`,
++  /// `light`, or `dark`). Public so the overlay engine (a separate Flutter
++  /// engine that cannot build a repository — it has no secure storage) can
++  /// read the same setting directly.
++  static const themeModeKey = 'theme_mode';
+ 
+   // ── Pre-built profile IDs ──────────────────────────────────────────
+   static const _openrouterDefaultProfileId = 'openrouter_default_profile';
+@@ -101,6 +105,26 @@ class SettingsRepository {
+   static const _openrouterApiKeyId = 'openrouter_api_key_entry';
+   static const _customApiKeyId = 'custom_api_key_entry';
+ 
++  /// Returns the original (first-install) system prompt for a built-in
++  /// template, or `null` when [templateId] is not a known built-in id.
++  ///
++  /// Used by the template editor's "Reset to Default" action so that
++  /// resetting a built-in template brings back ITS OWN prompt from the
++  /// shipped catalog — not a generic placeholder. Kept in sync with the
++  /// definitions used by [restoreBuiltInItems] and
++  /// [_applyBuiltInRevisions].
++  static String? builtInSystemPromptFor(String templateId) {
++    switch (templateId) {
++      case _professionalTranslatorTemplateId:
++      case _openaiTranslatorTemplateId:
++        return systemPromptTemplate;
++      case _geminiTranslatorTemplateId:
++        return geminiReconstructionTemplatePrompt;
++      default:
++        return null;
++    }
++  }
++
+   /// Creates a [SettingsRepository] with the given storage backends.
+   const SettingsRepository({
+     required FlutterSecureStorage secureStorage,
+@@ -234,7 +258,7 @@ class SettingsRepository {
+ 
+   /// Returns the theme mode, defaulting to [ThemeMode.system].
+   ThemeMode get themeMode {
+-    final v = _prefs.getString(_themeModeKey);
++    final v = _prefs.getString(themeModeKey);
+     return ThemeMode.values.firstWhere(
+       (m) => m.name == v,
+       orElse: () => ThemeMode.system,
+@@ -243,7 +267,7 @@ class SettingsRepository {
+ 
+   /// Persists the theme mode.
+   Future<void> setThemeMode(ThemeMode mode) async {
+-    await _prefs.setString(_themeModeKey, mode.name);
++    await _prefs.setString(themeModeKey, mode.name);
+   }
+ 
+   // ═══════════════════════════════════════════════════════════════════
+diff --git a/translation_app/pubspec.yaml b/translation_app/pubspec.yaml
+index 61c4fe6..6420b5d 100644
+--- a/translation_app/pubspec.yaml
++++ b/translation_app/pubspec.yaml
+@@ -1,5 +1,5 @@
+ name: translation_app
+-version: 0.1.5+2010
++version: 0.1.5+2011
+ resolution: workspace
+ 
+ publish_to: 'none'
+diff --git a/translation_app/test/services/settings_repository_builtin_prompts_test.dart b/translation_app/test/services/settings_repository_builtin_prompts_test.dart
+new file mode 100644
+index 0000000..73002f1
+--- /dev/null
++++ b/translation_app/test/services/settings_repository_builtin_prompts_test.dart
+@@ -0,0 +1,55 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:translation_app/services/settings_repository.dart';
++
++void main() {
++  group('SettingsRepository.builtInSystemPromptFor', () {
++    test('returns the reconstruction prompt for the Gemini template', () {
++      final prompt = SettingsRepository.builtInSystemPromptFor(
++        'gemini_translator_template',
++      );
++      expect(prompt, isNotNull);
++      expect(
++        prompt,
++        SettingsRepository.geminiReconstructionTemplatePrompt,
++        reason: 'Reset to Default must restore the template\'s own '
++            'formatting-reconstruction prompt, not a generic placeholder',
++      );
++    });
++
++    test('returns the generic expert prompt for OpenRouter/OpenAI templates',
++        () {
++      expect(
++        SettingsRepository.builtInSystemPromptFor(
++          'professional_translator_template',
++        ),
++        SettingsRepository.systemPromptTemplate,
++      );
++      expect(
++        SettingsRepository.builtInSystemPromptFor(
++          'openai_translator_template',
++        ),
++        SettingsRepository.systemPromptTemplate,
++      );
++    });
++
++    test('prompts contain the target-language placeholder', () {
++      for (final id in const [
++        'professional_translator_template',
++        'gemini_translator_template',
++        'openai_translator_template',
++      ]) {
++        expect(SettingsRepository.builtInSystemPromptFor(id),
++            contains('{{target_language}}'));
++      }
++    });
++
++    test('returns null for unknown or custom template ids', () {
++      expect(SettingsRepository.builtInSystemPromptFor('nope'), isNull);
++      expect(
++        SettingsRepository.builtInSystemPromptFor('1730000000000'),
++        isNull,
++        reason: 'user-created templates use timestamps as ids',
++      );
++    });
++  });
++}

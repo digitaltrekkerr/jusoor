@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:url_launcher/url_launcher.dart';
+import 'package:markdown_renderer/markdown_renderer.dart';
 
 class BiDiMarkdownView extends StatefulWidget {
   final String markdownText;
@@ -16,15 +16,18 @@ class BiDiMarkdownView extends StatefulWidget {
   });
 
   const BiDiMarkdownView.loading({super.key})
-      : markdownText = '',
-        isLoading = true,
-        selectable = false,
-        super();
+    : markdownText = '',
+      isLoading = true,
+      selectable = false,
+      super();
 
-  const BiDiMarkdownView.streaming({super.key, required String partial, this.selectable = false})
-      : markdownText = partial,
-        isLoading = false,
-        super();
+  const BiDiMarkdownView.streaming({
+    super.key,
+    required String partial,
+    this.selectable = false,
+  }) : markdownText = partial,
+       isLoading = false,
+       super();
 
   static TextDirection detectDirection(
     String text, {
@@ -83,30 +86,30 @@ class BiDiMarkdownView extends StatefulWidget {
 
 bool _isRtlRune(int rune) {
   return (rune >= 0x0590 && rune <= 0x05FF) || // Hebrew
-         (rune >= 0x0600 && rune <= 0x06FF) || // Arabic
-         (rune >= 0x0700 && rune <= 0x074F) || // Syriac
-         (rune >= 0x0750 && rune <= 0x077F) || // Arabic Supplement
-         (rune >= 0x0780 && rune <= 0x07BF) || // Thaana
-         (rune >= 0x07C0 && rune <= 0x07FF) || // NKo
-         (rune >= 0x0800 && rune <= 0x083F) || // Samaritan
-         (rune >= 0x0840 && rune <= 0x085F) || // Mandaic
-         (rune >= 0x0860 && rune <= 0x086F) || // Syriac Supplement
-         (rune >= 0x0870 && rune <= 0x089F) || // Arabic Extended-B
-         (rune >= 0x08A0 && rune <= 0x08FF) || // Arabic Extended-A
-         (rune >= 0xFB1D && rune <= 0xFDFF) || // Hebrew/Arabic Presentation Forms
-         (rune >= 0xFE70 && rune <= 0xFEFF) || // Arabic Presentation Forms-B
-         (rune >= 0x1E800 && rune <= 0x1EDFF) || // Mende Kikakui / Adlam
-         (rune >= 0x1EE00 && rune <= 0x1EEFF);   // Arabic Mathematical
+      (rune >= 0x0600 && rune <= 0x06FF) || // Arabic
+      (rune >= 0x0700 && rune <= 0x074F) || // Syriac
+      (rune >= 0x0750 && rune <= 0x077F) || // Arabic Supplement
+      (rune >= 0x0780 && rune <= 0x07BF) || // Thaana
+      (rune >= 0x07C0 && rune <= 0x07FF) || // NKo
+      (rune >= 0x0800 && rune <= 0x083F) || // Samaritan
+      (rune >= 0x0840 && rune <= 0x085F) || // Mandaic
+      (rune >= 0x0860 && rune <= 0x086F) || // Syriac Supplement
+      (rune >= 0x0870 && rune <= 0x089F) || // Arabic Extended-B
+      (rune >= 0x08A0 && rune <= 0x08FF) || // Arabic Extended-A
+      (rune >= 0xFB1D && rune <= 0xFDFF) || // Hebrew/Arabic Presentation Forms
+      (rune >= 0xFE70 && rune <= 0xFEFF) || // Arabic Presentation Forms-B
+      (rune >= 0x1E800 && rune <= 0x1EDFF) || // Mende Kikakui / Adlam
+      (rune >= 0x1EE00 && rune <= 0x1EEFF); // Arabic Mathematical
 }
 
 bool _isLtrRune(int rune) {
   return (rune >= 0x0041 && rune <= 0x005A) || // A-Z
-         (rune >= 0x0061 && rune <= 0x007A) || // a-z
-         (rune >= 0x00C0 && rune <= 0x024F) || // Latin Supplement + Extended
-         (rune >= 0x1E00 && rune <= 0x1EFF) || // Latin Extended Additional
-         (rune >= 0x2C60 && rune <= 0x2C7F) || // Latin Extended-C
-         (rune >= 0xA720 && rune <= 0xA7FF) || // Latin Extended-D
-         (rune >= 0xAB30 && rune <= 0xAB6F);    // Latin Extended-E
+      (rune >= 0x0061 && rune <= 0x007A) || // a-z
+      (rune >= 0x00C0 && rune <= 0x024F) || // Latin Supplement + Extended
+      (rune >= 0x1E00 && rune <= 0x1EFF) || // Latin Extended Additional
+      (rune >= 0x2C60 && rune <= 0x2C7F) || // Latin Extended-C
+      (rune >= 0xA720 && rune <= 0xA7FF) || // Latin Extended-D
+      (rune >= 0xAB30 && rune <= 0xAB6F); // Latin Extended-E
 }
 
 // Reused across calls: direction detection runs on every keystroke and every
@@ -160,100 +163,46 @@ class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
       previous: _detectedDirection,
     );
     if (newDir != _detectedDirection) {
-      setState(() { _detectedDirection = newDir; });
+      setState(() {
+        _detectedDirection = newDir;
+      });
     }
   }
 
-  Future<void> _onTapLink(String text, String? href, String title) async {
-    if (href == null) return;
-    final uri = Uri.tryParse(href);
-    if (uri == null) return;
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
+  /// Delegates to [handleMarkdownLinkTap] so link-tap behavior stays
+  /// in one place (shared with MarkdownView). [context] is the
+  /// State's own context, used by the confirmation dialog.
+  Future<void> _onTapLink(String text, String? href, String title) =>
+      handleMarkdownLinkTap(context, href);
 
+  /// Builds the [MarkdownStyleSheet] via the shared helper, with the
+  /// blockquote accent bar placed on the reading-start side for the
+  /// currently-detected [direction].
   MarkdownStyleSheet _buildStyleSheet(
     BuildContext context,
     TextDirection direction,
   ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final accentSide = BorderSide(color: colorScheme.primary, width: 4);
-
-    return MarkdownStyleSheet.fromTheme(theme).copyWith(
-      h1: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ) ??
-          const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-      h2: theme.textTheme.titleLarge?.copyWith(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onSurface,
-          ) ??
-          const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-      h3: theme.textTheme.titleMedium?.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: colorScheme.onSurface,
-          ) ??
-          const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
-      code: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 14,
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        color: colorScheme.onSurface,
-      ),
-      codeblockPadding: const EdgeInsets.all(16),
-      codeblockDecoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      a: TextStyle(
-        color: colorScheme.primary,
-        decoration: TextDecoration.underline,
-      ),
-      blockquote: TextStyle(
-        fontStyle: FontStyle.italic,
-        color: colorScheme.onSurfaceVariant,
-      ),
-      blockquotePadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 8,
-      ),
-      blockquoteDecoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(4),
-        // Accent bar sits on the reading-start side of the quote.
-        border: direction == TextDirection.rtl
-            ? Border(right: accentSide)
-            : Border(left: accentSide),
-      ),
-      tableBorder: TableBorder.all(
-        color: colorScheme.outlineVariant,
-        width: 1,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      tableHeadCellsPadding: const EdgeInsets.all(12),
-      tableCellsPadding: const EdgeInsets.all(12),
-      tableHeadCellsDecoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-      ),
-      listBullet: TextStyle(color: colorScheme.primary),
+    final blockquoteBorder = direction == TextDirection.rtl
+        ? Border(right: accentSide)
+        : Border(left: accentSide);
+    return buildBaseMarkdownStyleSheet(
+      context,
+      blockquoteBorder: blockquoteBorder,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    final direction = _detectedDirection ?? Directionality.maybeOf(context) ?? TextDirection.ltr;
+    final direction =
+        _detectedDirection ??
+        Directionality.maybeOf(context) ??
+        TextDirection.ltr;
 
     final styleSheet = _buildStyleSheet(context, direction);
 
@@ -268,7 +217,8 @@ class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
         // Fenced code blocks are code: force LTR base direction so mixed
         // Latin/symbol content inside an RTL document keeps its logical order.
         'pre': _LtrCodeBlockBuilder(
-          codeStyle: styleSheet.code ??
+          codeStyle:
+              styleSheet.code ??
               const TextStyle(fontFamily: 'monospace', fontSize: 14),
           background: Theme.of(context).colorScheme.surfaceContainerHighest,
           padding: styleSheet.codeblockPadding ?? const EdgeInsets.all(16),

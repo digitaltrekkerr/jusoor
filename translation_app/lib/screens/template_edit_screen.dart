@@ -4,6 +4,7 @@ import 'package:translation_core/translation_core.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
+import '../services/settings_repository.dart';
 
 /// Default system prompt used by the application.
 const _kDefaultSystemPrompt =
@@ -37,6 +38,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   bool _supportsText = true;
   bool _supportsImage = false;
   bool _substituteTargetLanguage = true;
+  bool _outputLanguageFixed = false;
 
   /// Whether this is an edit of an existing template.
   bool get _isEditing => widget.template != null;
@@ -77,6 +79,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     _supportsText = template.supportsText;
     _supportsImage = template.supportsImage;
     _substituteTargetLanguage = template.substituteTargetLanguage;
+    _outputLanguageFixed = template.outputLanguageFixed;
   }
 
   // ── Build ──────────────────────────────────────────────────────────
@@ -175,6 +178,14 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
             subtitle: Text(l10n.tplSubSubtitle('{{target_language}}')),
             onChanged: (v) => setState(() => _substituteTargetLanguage = v),
           ),
+
+          // ── Fixed Output Language (no {{target_language}} variable) ──
+          SwitchListTile(
+            value: _outputLanguageFixed,
+            title: Text(l10n.tplOutLangFixedTitle),
+            subtitle: Text(l10n.tplOutLangFixedSubtitle),
+            onChanged: (v) => setState(() => _outputLanguageFixed = v),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -187,11 +198,23 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  bool get _systemPromptMissingTargetLanguage =>
-      !_systemPromptController.text.contains('{{target_language}}');
+  bool get _systemPromptMissingTargetLanguage {
+    // Fixed-output-language templates bake the target into the prompt body
+    // themselves and have no `{{target_language}}` placeholder by design —
+    // do not warn about a missing placeholder that is not expected there.
+    if (_outputLanguageFixed) return false;
+    return !_systemPromptController.text.contains('{{target_language}}');
+  }
 
   void _resetSystemPrompt() {
-    _systemPromptController.text = _kDefaultSystemPrompt;
+    // For built-in templates, restore the template's OWN original prompt
+    // from the shipped catalog (what the user saw at first install), not a
+    // generic placeholder. Custom templates fall back to the generic one.
+    final template = widget.template;
+    final original = template == null
+        ? null
+        : SettingsRepository.builtInSystemPromptFor(template.id);
+    _systemPromptController.text = original ?? _kDefaultSystemPrompt;
     setState(() {});
   }
 
@@ -241,6 +264,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
       supportsText: _supportsText,
       supportsImage: _supportsImage,
       substituteTargetLanguage: _substituteTargetLanguage,
+      outputLanguageFixed: _outputLanguageFixed,
       isBuiltIn: _isEditing ? widget.template!.isBuiltIn : false,
     );
 

@@ -26,6 +26,26 @@ class SharedContent {
   bool get hasImage => imageBytes != null && imageBytes!.isNotEmpty;
 }
 
+/// Maximum size (in bytes) of a shared file we will load into memory.
+///
+/// Guards against a giant share intent (e.g. a multi-GB video) causing an
+/// out-of-memory crash while reading it into a [Uint8List]. Mirrored on the
+/// Android side by `MAX_SHARED_FILE_BYTES` in `MainActivity.kt`.
+const int kMaxSharedFileBytes = 50 * 1024 * 1024; // 50 MB
+
+/// Exception thrown when a shared file exceeds [kMaxSharedFileBytes].
+class SharedFileTooLargeException implements Exception {
+  /// Actual file size in bytes.
+  final int sizeBytes;
+
+  /// Creates a [SharedFileTooLargeException].
+  const SharedFileTooLargeException(this.sizeBytes);
+
+  @override
+  String toString() =>
+      'SharedFileTooLargeException: file is $sizeBytes bytes (> 50 MB)';
+}
+
 /// Service that listens for incoming share intents (both cold-start and
 /// warm-start) and emits [SharedContent] objects through a broadcast stream.
 ///
@@ -107,6 +127,13 @@ class ShareIntentHandler {
     final file = File(filePath);
     if (!await file.exists()) return content;
 
+    // Check the size ceiling BEFORE reading so a giant file never gets
+    // loaded into memory (OOM protection, mirrors the Kotlin side).
+    final length = await file.length();
+    if (length > kMaxSharedFileBytes) {
+      throw SharedFileTooLargeException(length);
+    }
+
     if (content.imageMimeType != null || _isImagePath(filePath)) {
       final bytes = await file.readAsBytes();
       return SharedContent(
@@ -127,6 +154,17 @@ class ShareIntentHandler {
     try {
       final result = await _platformChannel.invokeMethod('readContentUri', uri);
       return result as Uint8List?;
+    } on PlatformException catch (e) {
+      // The Kotlin side already enforces the 50 MB ceiling and reports
+      // FILE_TOO_LARGE with the actual size; surface it as the same
+      // exception so callers show one consistent message.
+      if (e.code == 'FILE_TOO_LARGE') {
+        final sizeBytes = e.details is int
+            ? e.details as int
+            : kMaxSharedFileBytes;
+        throw SharedFileTooLargeException(sizeBytes);
+      }
+      return null;
     } catch (e) {
       return null;
     }

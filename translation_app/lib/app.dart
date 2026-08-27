@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'l10n/app_localizations.dart';
+import 'providers/history_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/share_intent_provider.dart';
 import 'screens/home_screen.dart';
@@ -110,15 +111,18 @@ class _AppShellState extends ConsumerState<_AppShell> {
   }
 }
 
-class _MainNavigation extends StatefulWidget {
+class _MainNavigation extends ConsumerStatefulWidget {
   const _MainNavigation();
 
   @override
-  State<_MainNavigation> createState() => _MainNavigationState();
+  ConsumerState<_MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<_MainNavigation> {
+class _MainNavigationState extends ConsumerState<_MainNavigation> {
   int _currentIndex = 0;
+
+  /// Index of the History tab in the navigation destinations.
+  static const int _historyTabIndex = 1;
 
   static const _screens = <Widget>[
     HomeScreen(),
@@ -135,6 +139,13 @@ class _MainNavigationState extends State<_MainNavigation> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           setState(() => _currentIndex = index);
+          // The History screen is preloaded inside the IndexedStack, so it
+          // never re-fetches when the tab is switched to. Reload it whenever
+          // it becomes visible so entries saved by other flows (overlay,
+          // share intent) show up without an app restart.
+          if (index == _historyTabIndex) {
+            ref.read(historyListProvider.notifier).refresh();
+          }
         },
         destinations: [
           NavigationDestination(

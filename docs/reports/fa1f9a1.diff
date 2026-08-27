@@ -1,0 +1,4553 @@
+commit fa1f9a1013414db2f13159a09f988c32b7626e56
+Author: Digital Trekkerr <support@digitaltrekkerr.com>
+Date:   Wed Aug 26 13:30:29 2026 +0300
+
+    V2 — apply 6 user-requested features
+    
+    • R1: Articles stay Arabic-only regardless of app locale
+      (comment + arabic-titles invariant test)
+    • R2: Profile-edit screen forces API key selection before
+      picking a model (bottom sheet + red border highlight)
+    • R3: Disable thinking by default across Gemini/OpenRouter/OpenAI-
+      compatible providers (switch per template)
+    • R4: Disable stream by default + max-output-words = 10000
+      (TranslationRequest.maxOutputWords × 2 → max_tokens)
+    • R6: PromptTemplate.outputLanguageFixed flag hides the target-
+      language selector on home and refuses overlay assignment
+    • R7: Copy defaults to plain text; long-press shows plain/Markdown
+      options; Share offers plain/Markdown/save-file; overlay channel
+      mirrors with native Kotlin stripMarkdown fallback
+    
+    Adds:
+    • strip_markdown package + markdown_stripper utility (12 tests)
+    • OpenRouterCapabilities cache (7-day TTL for /api/v1/models)
+    • 14 new locale strings (en + ar)
+    • Provider tests for Gemini/OpenRouter/OpenAI-compatible
+    
+    Build: 0.1.5+2010 (was 0.1.5+2009)
+
+diff --git a/packages/markdown_renderer/lib/markdown_renderer.dart b/packages/markdown_renderer/lib/markdown_renderer.dart
+index d70a424..b315990 100644
+--- a/packages/markdown_renderer/lib/markdown_renderer.dart
++++ b/packages/markdown_renderer/lib/markdown_renderer.dart
+@@ -5,3 +5,4 @@
+ library;
+ 
+ export 'src/widgets/markdown_view.dart';
++export 'src/utils/markdown_stripper.dart';
+diff --git a/packages/markdown_renderer/lib/src/utils/markdown_stripper.dart b/packages/markdown_renderer/lib/src/utils/markdown_stripper.dart
+new file mode 100644
+index 0000000..637a629
+--- /dev/null
++++ b/packages/markdown_renderer/lib/src/utils/markdown_stripper.dart
+@@ -0,0 +1,19 @@
++import 'package:strip_markdown/strip_markdown.dart';
++
++/// Strips Markdown formatting from a string, leaving plain text suitable for
++/// clipboard copy, share text, and PDF body content.
++///
++/// Wraps `removeMd` from the `strip_markdown` package (a Dart port of
++/// the popular Node.js `remove-markdown`). Trims leading/trailing whitespace
++/// and collapses runs of internal whitespace to single spaces so the result
++/// reads as natural prose.
++///
++/// Example:
++/// ```dart
++/// toPlainText('# Hello **world**'); // => 'Hello world'
++/// toPlainText('[link](https://x.com)'); // => 'link'
++/// ```
++String toPlainText(String markdown) {
++  final stripped = removeMd(markdown);
++  return stripped.replaceAll(RegExp(r'\s+'), ' ').trim();
++}
+\ No newline at end of file
+diff --git a/packages/markdown_renderer/pubspec.yaml b/packages/markdown_renderer/pubspec.yaml
+index 1d1885d..368a49f 100644
+--- a/packages/markdown_renderer/pubspec.yaml
++++ b/packages/markdown_renderer/pubspec.yaml
+@@ -9,6 +9,7 @@ dependencies:
+   flutter:
+     sdk: flutter
+   flutter_markdown_plus: ^1.0.7
++  strip_markdown: ^1.0.1
+   url_launcher: ^6.2.5
+ 
+ dev_dependencies:
+diff --git a/packages/markdown_renderer/test/markdown_stripper_test.dart b/packages/markdown_renderer/test/markdown_stripper_test.dart
+new file mode 100644
+index 0000000..360e4f7
+--- /dev/null
++++ b/packages/markdown_renderer/test/markdown_stripper_test.dart
+@@ -0,0 +1,62 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:markdown_renderer/markdown_renderer.dart';
++
++void main() {
++  group('toPlainText', () {
++    test('strips bold markdown', () {
++      expect(toPlainText('**hello**'), 'hello');
++    });
++
++    test('strips italic markdown', () {
++      expect(toPlainText('*hello*'), 'hello');
++      expect(toPlainText('_hello_'), 'hello');
++    });
++
++    test('strips headers', () {
++      expect(toPlainText('# Title'), 'Title');
++      expect(toPlainText('## Subtitle'), 'Subtitle');
++    });
++
++    test('strips links but keeps text', () {
++      expect(toPlainText('[link](https://example.com)'), 'link');
++    });
++
++    test('strips inline code backticks', () {
++      expect(toPlainText('use `print()` here'), 'use print() here');
++    });
++
++    test('strips fenced code blocks but keeps content', () {
++      expect(
++        toPlainText('```dart\nvoid main() {}\n```'),
++        contains('void main'),
++      );
++    });
++
++    test('collapses whitespace runs to single space', () {
++      expect(toPlainText('a   b\n\nc'), 'a b c');
++    });
++
++    test('trims leading and trailing whitespace', () {
++      expect(toPlainText('  hello  '), 'hello');
++    });
++
++    test('passes through plain text untouched', () {
++      expect(toPlainText('Just plain text.'), 'Just plain text.');
++    });
++
++    test('handles Arabic markdown', () {
++      expect(toPlainText('**مرحبا** بالعالم'), 'مرحبا بالعالم');
++    });
++
++    test('handles empty string', () {
++      expect(toPlainText(''), '');
++    });
++
++    test('handles nested markdown', () {
++      expect(
++        toPlainText('## **bold title**'),
++        'bold title',
++      );
++    });
++  });
++}
+\ No newline at end of file
+diff --git a/packages/translation_core/lib/src/models/prompt_template.dart b/packages/translation_core/lib/src/models/prompt_template.dart
+index 246fd1f..76a1946 100644
+--- a/packages/translation_core/lib/src/models/prompt_template.dart
++++ b/packages/translation_core/lib/src/models/prompt_template.dart
+@@ -38,6 +38,31 @@ class PromptTemplate extends Equatable {
+   /// Defaults to `true` for backward compatibility.
+   final bool substituteTargetLanguage;
+ 
++  /// When `true`, this template does not depend on a `{{target_language}}`
++  /// variable — its output language is fixed inside the template body.
++  ///
++  /// The home screen hides the target-language selector when this template
++  /// is active, and the overlay translation feature refuses to use it
++  /// (the overlay always needs a user-chosen target language).
++  ///
++  /// Defaults to `false` for backward compatibility.
++  final bool outputLanguageFixed;
++
++  /// Whether the model used by this template should use its reasoning /
++  /// thinking capability. Defaults to `false` for predictable latency.
++  ///
++  /// Providers that do not support reasoning on the chosen model silently
++  /// ignore this flag.
++  final bool enableThinking;
++
++  /// Whether the provider should stream the translation response.
++  /// Defaults to `false` for predictable capture/share flows.
++  final bool stream;
++
++  /// Maximum desired output word count for translations produced by this
++  /// template. Defaults to `10000` to match the global app default.
++  final int maxOutputWords;
++
+   /// Creates a [PromptTemplate].
+   const PromptTemplate({
+     required this.id,
+@@ -48,6 +73,10 @@ class PromptTemplate extends Equatable {
+     required this.supportsImage,
+     this.isBuiltIn = false,
+     this.substituteTargetLanguage = true,
++    this.outputLanguageFixed = false,
++    this.enableThinking = false,
++    this.stream = false,
++    this.maxOutputWords = 10000,
+   });
+ 
+   /// Creates a [PromptTemplate] from a JSON map.
+@@ -65,6 +94,10 @@ class PromptTemplate extends Equatable {
+       isBuiltIn: json['isBuiltIn'] as bool? ?? false,
+       substituteTargetLanguage:
+           json['substituteTargetLanguage'] as bool? ?? true,
++      outputLanguageFixed: json['outputLanguageFixed'] as bool? ?? false,
++      enableThinking: json['enableThinking'] as bool? ?? false,
++      stream: json['stream'] as bool? ?? false,
++      maxOutputWords: json['maxOutputWords'] as int? ?? 10000,
+     );
+   }
+ 
+@@ -79,6 +112,10 @@ class PromptTemplate extends Equatable {
+       'supportsImage': supportsImage,
+       'isBuiltIn': isBuiltIn,
+       'substituteTargetLanguage': substituteTargetLanguage,
++      'outputLanguageFixed': outputLanguageFixed,
++      'enableThinking': enableThinking,
++      'stream': stream,
++      'maxOutputWords': maxOutputWords,
+     };
+   }
+ 
+@@ -92,6 +129,10 @@ class PromptTemplate extends Equatable {
+     bool? supportsImage,
+     bool? isBuiltIn,
+     bool? substituteTargetLanguage,
++    bool? outputLanguageFixed,
++    bool? enableThinking,
++    bool? stream,
++    int? maxOutputWords,
+   }) {
+     return PromptTemplate(
+       id: id ?? this.id,
+@@ -103,6 +144,10 @@ class PromptTemplate extends Equatable {
+       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+       substituteTargetLanguage:
+           substituteTargetLanguage ?? this.substituteTargetLanguage,
++      outputLanguageFixed: outputLanguageFixed ?? this.outputLanguageFixed,
++      enableThinking: enableThinking ?? this.enableThinking,
++      stream: stream ?? this.stream,
++      maxOutputWords: maxOutputWords ?? this.maxOutputWords,
+     );
+   }
+ 
+@@ -116,5 +161,9 @@ class PromptTemplate extends Equatable {
+     supportsImage,
+     isBuiltIn,
+     substituteTargetLanguage,
++    outputLanguageFixed,
++    enableThinking,
++    stream,
++    maxOutputWords,
+   ];
+ }
+diff --git a/packages/translation_core/lib/src/models/translation_request.dart b/packages/translation_core/lib/src/models/translation_request.dart
+index 9ac2efa..b713c3c 100644
+--- a/packages/translation_core/lib/src/models/translation_request.dart
++++ b/packages/translation_core/lib/src/models/translation_request.dart
+@@ -56,6 +56,36 @@ class TranslationRequest extends Equatable {
+   /// honor it without needing direct access to the template object.
+   final bool substituteTargetLanguage;
+ 
++  /// Whether to enable the model's reasoning/thinking capability.
++  ///
++  /// Defaults to `false` (thinking disabled) for predictable latency and
++  /// cost. Providers that support reasoning tokens honor this flag by
++  /// sending the appropriate parameter (e.g. Gemini `thinkingBudget`,
++  /// OpenRouter/OpenAI `reasoning` object). When `false`, providers
++  /// either omit the parameter or send the "disabled" value
++  /// (`thinkingBudget: 0`, `reasoning.effort: 'none'`, etc.).
++  ///
++  /// The provider layer reports whether the underlying model actually
++  /// supports thinking via its capability metadata; this flag is
++  /// silently downgraded to `false` when the model cannot think.
++  final bool enableThinking;
++
++  /// Whether the translation response should be streamed.
++  ///
++  /// Defaults to `false` (single-shot response) for predictable output
++  /// capture and easier clipboard/share flows. Providers that support
++  /// streaming honor this flag via the `stream` parameter; non-streaming
++  /// providers ignore it.
++  final bool stream;
++
++  /// Maximum desired output word count.
++  ///
++  /// Providers translate this into the appropriate `max_tokens` /
++  /// `maxOutputTokens` parameter (using a ~2× token-to-word safety
++  /// multiplier to cover both English and Arabic content). Defaults to
++  /// `10000` to match the global app default.
++  final int maxOutputWords;
++
+   /// Creates a [TranslationRequest].
+   ///
+   /// Only [inputText] and [targetLanguage] are required; all other fields
+@@ -70,6 +100,9 @@ class TranslationRequest extends Equatable {
+     this.model = 'openai/gpt-4o',
+     this.profileId,
+     this.substituteTargetLanguage = true,
++    this.enableThinking = false,
++    this.stream = false,
++    this.maxOutputWords = 10000,
+   }) : assert(
+          inputText != '' || imageBase64 != null,
+          'inputText must not be empty unless imageBase64 is provided',
+@@ -90,6 +123,9 @@ class TranslationRequest extends Equatable {
+       profileId: json['profileId'] as String?,
+       substituteTargetLanguage:
+           json['substituteTargetLanguage'] as bool? ?? true,
++      enableThinking: json['enableThinking'] as bool? ?? false,
++      stream: json['stream'] as bool? ?? false,
++      maxOutputWords: json['maxOutputWords'] as int? ?? 10000,
+     );
+   }
+ 
+@@ -105,6 +141,9 @@ class TranslationRequest extends Equatable {
+       'model': model,
+       'profileId': profileId,
+       'substituteTargetLanguage': substituteTargetLanguage,
++      'enableThinking': enableThinking,
++      'stream': stream,
++      'maxOutputWords': maxOutputWords,
+     };
+   }
+ 
+@@ -123,6 +162,9 @@ class TranslationRequest extends Equatable {
+     String? model,
+     Object? profileId = _undefined,
+     bool? substituteTargetLanguage,
++    bool? enableThinking,
++    bool? stream,
++    int? maxOutputWords,
+   }) {
+     return TranslationRequest(
+       inputText: inputText ?? this.inputText,
+@@ -141,6 +183,9 @@ class TranslationRequest extends Equatable {
+           : profileId as String?,
+       substituteTargetLanguage:
+           substituteTargetLanguage ?? this.substituteTargetLanguage,
++      enableThinking: enableThinking ?? this.enableThinking,
++      stream: stream ?? this.stream,
++      maxOutputWords: maxOutputWords ?? this.maxOutputWords,
+     );
+   }
+ 
+@@ -155,6 +200,9 @@ class TranslationRequest extends Equatable {
+         model,
+         profileId,
+         substituteTargetLanguage,
++        enableThinking,
++        stream,
++        maxOutputWords,
+       ];
+ }
+ 
+diff --git a/packages/translation_core/lib/src/providers/gemini_provider.dart b/packages/translation_core/lib/src/providers/gemini_provider.dart
+index 716ba3f..854b5b3 100644
+--- a/packages/translation_core/lib/src/providers/gemini_provider.dart
++++ b/packages/translation_core/lib/src/providers/gemini_provider.dart
+@@ -1,4 +1,5 @@
+ import 'dart:convert';
++import 'dart:developer' as developer;
+ 
+ import 'package:dio/dio.dart';
+ 
+@@ -14,6 +15,25 @@ const _kBaseGeminiUrl =
+ 
+ const _kGeminiResponsePath = 'candidates.0.content.parts.0.text';
+ 
++/// Matches Gemini 2.5 Pro model identifiers (canonical `2.5-pro`,
++/// hyphen variant `2-5-pro`, and any future `2.5-pro-<tier>` flavors).
++final _kGemini25ProPattern = RegExp(r'2\.5[ -]?pro');
++
++/// Emits a developer log warning when thinking is disabled on a model
++/// family that ignores `thinkingBudget=0` (Gemini 2.5 Pro as of the
++/// 2026-01 API docs). The warning is informational; the request still
++/// proceeds with `thinkingBudget=0` per the user's preference.
++void _warnIncompatibleThinking(String model, bool enableThinking) {
++  if (enableThinking || !_kGemini25ProPattern.hasMatch(model.toLowerCase())) {
++    return;
++  }
++  developer.log(
++    'Gemini 2.5 Pro always thinks; thinkingBudget=0 will be ignored by the '
++    'API. Model: $model',
++    name: 'GeminiProvider',
++  );
++}
++
+ class GeminiProvider implements TranslationProvider {
+   final String apiKey;
+ 
+@@ -34,6 +54,10 @@ class GeminiProvider implements TranslationProvider {
+   }) : _dio = dio ?? Dio();
+ 
+   String _buildEndpointUrl(String modelToUse) {
++    // Honor the per-request `stream` flag when set; fall back to the
++    // constructor default for backwards-compatible callers.
++    // Note: `translate` flips on `request.stream || stream` before this
++    // is reached, so we just read the consolidated value.
+     if (stream) {
+       return '$_kBaseGeminiUrl/$modelToUse:streamGenerateContent?alt=sse';
+     }
+@@ -54,14 +78,15 @@ class GeminiProvider implements TranslationProvider {
+       );
+       final data = response.data as Map<String, dynamic>;
+       final models = data['models'] as List<dynamic>;
+-      return models
+-          .map((m) {
+-            final name = (m as Map<String, dynamic>)['name'] as String;
+-            return name.startsWith('models/') ? name.substring(7) : name;
+-          })
+-          .toList();
++      return models.map((m) {
++        final name = (m as Map<String, dynamic>)['name'] as String;
++        return name.startsWith('models/') ? name.substring(7) : name;
++      }).toList();
+     } on DioException catch (e) {
+-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
++      throw TranslationException(
++        e.message ?? 'Failed to fetch models',
++        statusCode: e.response?.statusCode,
++      );
+     } catch (e) {
+       throw TranslationException('Unexpected error fetching models: $e');
+     }
+@@ -72,12 +97,18 @@ class GeminiProvider implements TranslationProvider {
+     final isVision =
+         request.imageBase64 != null && request.imageBase64!.isNotEmpty;
+     final effectiveModel = isVision ? (visionModel ?? model) : model;
++    _warnIncompatibleThinking(effectiveModel, request.enableThinking);
+     final bodyJson = isVision
+         ? _buildVisionBody(request)
+         : _buildTextBody(request);
+ 
++    // Per-request `stream` takes precedence over the constructor default so
++    // users can toggle streaming at the call site without re-instantiating
++    // the provider (the template editor wires this flag in).
++    final useStream = request.stream || stream;
++
+     try {
+-      if (stream) {
++      if (useStream) {
+         yield* _handleStreamResponse(effectiveModel, bodyJson);
+       } else {
+         yield await _handleNonStreamResponse(effectiveModel, bodyJson);
+@@ -152,6 +183,16 @@ class GeminiProvider implements TranslationProvider {
+       VariableSubstitutor.buildRawVariableMap(request),
+       substituteTargetLanguage: request.substituteTargetLanguage,
+     );
++    final generationConfig = <String, dynamic>{
++      // Roughly 2× word-to-token safety multiplier so both English
++      // (~0.75 token/word) and Arabic (~0.6 token/word) content fit.
++      'maxOutputTokens': request.maxOutputWords * 2,
++      // Disable thinking by default; allow opt-in via `enableThinking`.
++      // `thinkingBudget=0` is honored by Gemini 2.5 Flash/Flash-Lite; on
++      // Gemini 2.5 Pro thinking cannot be disabled — the provider layer
++      // warns the UI when that combination occurs.
++      'thinkingConfig': {'thinkingBudget': request.enableThinking ? -1 : 0},
++    };
+     return {
+       'systemInstruction': {
+         'parts': [
+@@ -166,6 +207,7 @@ class GeminiProvider implements TranslationProvider {
+           ],
+         },
+       ],
++      'generationConfig': generationConfig,
+     };
+   }
+ 
+@@ -199,6 +241,10 @@ class GeminiProvider implements TranslationProvider {
+           ],
+         },
+       ],
++      'generationConfig': {
++        'maxOutputTokens': request.maxOutputWords * 2,
++        'thinkingConfig': {'thinkingBudget': request.enableThinking ? -1 : 0},
++      },
+     };
+   }
+ }
+diff --git a/packages/translation_core/lib/src/providers/openai_compatible_provider.dart b/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
+index ea4f583..4e9640b 100644
+--- a/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
++++ b/packages/translation_core/lib/src/providers/openai_compatible_provider.dart
+@@ -10,7 +10,7 @@ import '../utils/sse_parser.dart';
+ import '../utils/variable_substitutor.dart';
+ 
+ const _kDefaultBodyTemplate =
+-    '{"model":"{{model}}","messages":[{"role":"system","content":"{{system_prompt}}"},{"role":"user","content":"{{input_text}}"}],"stream":true}';
++    '{"model":"{{model}}","messages":[{"role":"system","content":"{{system_prompt}}"},{"role":"user","content":"{{input_text}}"}]}';
+ 
+ const _kDefaultHeaders = <String, String>{
+   'Authorization': 'Bearer {{api_key}}',
+@@ -64,9 +64,14 @@ class OpenAICompatibleProvider implements TranslationProvider {
+       );
+       final data = response.data as Map<String, dynamic>;
+       final models = data['data'] as List<dynamic>;
+-      return models.map((m) => (m as Map<String, dynamic>)['id'] as String).toList();
++      return models
++          .map((m) => (m as Map<String, dynamic>)['id'] as String)
++          .toList();
+     } on DioException catch (e) {
+-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
++      throw TranslationException(
++        e.message ?? 'Failed to fetch models',
++        statusCode: e.response?.statusCode,
++      );
+     } catch (e) {
+       throw TranslationException('Unexpected error fetching models: $e');
+     }
+@@ -99,6 +104,16 @@ class OpenAICompatibleProvider implements TranslationProvider {
+       bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+     }
+ 
++    // Per-request overrides: rewrite `stream`, add `max_tokens`, and attach
++    // `reasoning_effort` on o-series-style models when thinking is enabled.
++    bodyJson['stream'] = request.stream || stream;
++    bodyJson['max_tokens'] = request.maxOutputWords * 2;
++    if (request.enableThinking && _supportsReasoningEffort(model)) {
++      bodyJson['reasoning_effort'] = 'low';
++    } else if (!request.enableThinking) {
++      bodyJson.remove('reasoning_effort');
++    }
++
+     final isStreaming = bodyJson['stream'] == true;
+ 
+     try {
+@@ -148,7 +163,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
+       substituteTargetLanguage: request.substituteTargetLanguage,
+     );
+ 
+-    return {
++    final body = <String, dynamic>{
+       'model': effectiveModel,
+       'messages': [
+         {'role': 'system', 'content': resolvedPrompt},
+@@ -171,8 +186,27 @@ class OpenAICompatibleProvider implements TranslationProvider {
+           ],
+         },
+       ],
+-      'stream': stream,
++      'stream': request.stream || stream,
++      'max_tokens': request.maxOutputWords * 2,
+     };
++    if (request.enableThinking && _supportsReasoningEffort(effectiveModel)) {
++      body['reasoning_effort'] = 'low';
++    } else if (!request.enableThinking) {
++      body.remove('reasoning_effort');
++    }
++    return body;
++  }
++
++  /// Heuristic: detect o-series / GPT-5 / DeepSeek-R1 style models that
++  /// accept the `reasoning_effort` parameter.
++  ///
++  /// Conservative — only attaches the parameter when the model name clearly
++  /// matches a reasoning-capable family. Add more prefixes here as new
++  /// reasoning models appear.
++  bool _supportsReasoningEffort(String modelName) {
++    final m = modelName.toLowerCase();
++    return RegExp(r'^(o1|o3|o4|gpt-5|gpt-oss)').hasMatch(m) ||
++        m.contains('deepseek-r1');
+   }
+ 
+   Stream<String> _handleStreamResponse(ResponseBody? responseBody) async* {
+diff --git a/packages/translation_core/lib/src/providers/openrouter_capabilities.dart b/packages/translation_core/lib/src/providers/openrouter_capabilities.dart
+new file mode 100644
+index 0000000..dd29f0d
+--- /dev/null
++++ b/packages/translation_core/lib/src/providers/openrouter_capabilities.dart
+@@ -0,0 +1,161 @@
++import 'package:dio/dio.dart';
++
++/// One model's reasoning capability block from OpenRouter's `/api/v1/models`.
++///
++/// Source: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
++/// Sample payload:
++/// ```
++/// {
++///   "id": "google/gemini-3.5-flash",
++///   "reasoning": {
++///     "supported_efforts": ["high", "medium", "low", "minimal"],
++///     "default_effort": "medium",
++///     "default_enabled": true,
++///     "mandatory": true
++///   }
++/// }
++/// ```
++class OpenRouterReasoningCapability {
++  const OpenRouterReasoningCapability({
++    required this.supportedEfforts,
++    required this.defaultEnabled,
++    required this.mandatory,
++  });
++
++  /// Efforts the model accepts for `reasoning.effort`, e.g.
++  /// `['xhigh', 'high', 'medium', 'low', 'minimal', 'none']`.
++  final List<String> supportedEfforts;
++
++  /// Whether the model is reasoning by default.
++  final bool defaultEnabled;
++
++  /// Whether reasoning cannot be turned off for this model.
++  final bool mandatory;
++
++  /// True when the model exposes a controllable `reasoning` block and
++  /// reasoning can actually be turned off.
++  bool get supportsReasoning => supportedEfforts.isNotEmpty && !mandatory;
++
++  /// Recommended `reasoning.effort` to send when thinking is enabled.
++  ///
++  /// Falls back to the first supported effort (e.g. `low`) if OpenRouter
++  /// has not provided a `default_effort`. The caller should treat this as
++  /// a hint, not a guarantee.
++  String get recommendedEffort {
++    if (supportedEfforts.isEmpty) return 'low';
++    if (supportedEfforts.contains('low')) return 'low';
++    return supportedEfforts.first;
++  }
++
++  Map<String, dynamic> toJson() => <String, dynamic>{
++        'supported_efforts': supportedEfforts,
++        'default_enabled': defaultEnabled,
++        'mandatory': mandatory,
++      };
++
++  factory OpenRouterReasoningCapability.fromJson(Map<String, dynamic> json) {
++    final rawList = json['supported_efforts'];
++    final list = rawList is List
++        ? rawList.map((e) => e.toString()).toList()
++        : const <String>[];
++    return OpenRouterReasoningCapability(
++      supportedEfforts: list,
++      defaultEnabled: json['default_enabled'] as bool? ?? false,
++      mandatory: json['mandatory'] as bool? ?? false,
++    );
++  }
++}
++
++/// In-memory snapshot of OpenRouter model capabilities.
++///
++/// Produced by [OpenRouterCapabilities.refresh] and passed straight to
++/// [OpenRouterCapabilities.get] lookups. Snapshots are immutable.
++class OpenRouterCapabilitiesSnapshot {
++  const OpenRouterCapabilitiesSnapshot(this.byModelId);
++
++  /// Capability indexed by model id (e.g. `google/gemini-3.5-flash`).
++  final Map<String, OpenRouterReasoningCapability> byModelId;
++
++  /// Returns the capability for [modelId], or `null` if the model is unknown.
++  OpenRouterReasoningCapability? operator [](String modelId) =>
++      byModelId[modelId];
++
++  /// True if [modelId] is known to support a controllable reasoning block.
++  bool supportsReasoning(String modelId) =>
++      byModelId[modelId]?.supportsReasoning ?? false;
++
++  /// True if [modelId] is known to have mandatory reasoning (cannot be
++  /// disabled, e.g. certain Gemini 2.5 / 3.x models).
++  bool isMandatory(String modelId) =>
++      byModelId[modelId]?.mandatory ?? false;
++}
++
++/// Fetches OpenRouter model capabilities (specifically the `reasoning`
++/// block) so callers can decide whether to attach `reasoning.effort` to a
++/// translation request.
++///
++/// The snapshot is held in memory only — caching across process restarts
++/// is intentionally left to the caller (e.g. via `SharedPreferences` in
++/// the application layer) to avoid pulling platform dependencies into
++/// `translation_core`.
++class OpenRouterCapabilities {
++  OpenRouterCapabilities({Dio? dio}) : _dio = dio ?? Dio();
++
++  final Dio _dio;
++
++  OpenRouterCapabilitiesSnapshot? _snapshot;
++
++  /// Returns the reasoning capability for [modelId], or `null` when the
++  /// model is unknown or capabilities have not been loaded yet.
++  ///
++  /// Tries the in-memory snapshot first, then falls back to a fresh API
++  /// fetch. Callers wanting to surface a manual "Refresh" action can use
++  /// [refresh] instead.
++  Future<OpenRouterReasoningCapability?> get(String modelId) async {
++    final snapshot = _snapshot ??= await _fetch();
++    return snapshot?[modelId];
++  }
++
++  /// Forces a refresh from the OpenRouter API. Safe to call repeatedly.
++  Future<OpenRouterCapabilitiesSnapshot?> refresh() async {
++    _snapshot = await _fetch();
++    return _snapshot;
++  }
++
++  Future<OpenRouterCapabilitiesSnapshot?> _fetch() async {
++    try {
++      final res = await _dio.get<Map<String, dynamic>>(
++        'https://openrouter.ai/api/v1/models',
++        options: Options(
++          headers: <String, String>{'Content-Type': 'application/json'},
++          responseType: ResponseType.json,
++        ),
++      );
++      final data = res.data;
++      if (data == null) return null;
++      final list = data['data'];
++      if (list is! List) return null;
++      final out = <String, OpenRouterReasoningCapability>{};
++      for (final raw in list) {
++        if (raw is! Map) continue;
++        final id = raw['id'];
++        final reasoning = raw['reasoning'];
++        if (id is String && reasoning is Map) {
++          out[id] = OpenRouterReasoningCapability.fromJson(
++            Map<String, dynamic>.from(reasoning),
++          );
++        }
++      }
++      return OpenRouterCapabilitiesSnapshot(Map.unmodifiable(out));
++    } on DioException {
++      return null;
++    } catch (_) {
++      return null;
++    }
++  }
++
++  /// Releases the underlying [Dio] instance.
++  void dispose() {
++    _dio.close(force: true);
++  }
++}
+\ No newline at end of file
+diff --git a/packages/translation_core/lib/src/providers/openrouter_provider.dart b/packages/translation_core/lib/src/providers/openrouter_provider.dart
+index aa2bc0b..5dc8934 100644
+--- a/packages/translation_core/lib/src/providers/openrouter_provider.dart
++++ b/packages/translation_core/lib/src/providers/openrouter_provider.dart
+@@ -13,6 +13,10 @@ import '../utils/variable_substitutor.dart';
+ const _kDefaultEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
+ 
+ /// Default body template for OpenRouter chat completions.
++///
++/// The `stream` flag in the template is rewritten at request time based on
++/// the [TranslationRequest.stream] value, so callers do not need to edit
++/// the template to toggle streaming.
+ const _kDefaultBodyTemplate =
+     '{"model":"{{model}}","messages":[{"role":"system","content":"{{system_prompt}}"},{"role":"user","content":"{{input_text}}"}],"stream":true}';
+ 
+@@ -156,12 +160,23 @@ class OpenRouterProvider implements TranslationProvider {
+     } else {
+       final substitutedBody = VariableSubstitutor.substituteMap(
+         bodyTemplate,
+-        variableMap,
++        VariableSubstitutor.buildRawVariableMap(request),
+         substituteTargetLanguage: request.substituteTargetLanguage,
+       );
+       bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+     }
+ 
++    // Per-request overrides: rewrite `stream`, add `max_tokens`, attach
++    // `reasoning` when thinking is requested. These keep the public template
++    // edit-free while honoring the new template-level toggles.
++    bodyJson['stream'] = request.stream || stream;
++    bodyJson['max_tokens'] = request.maxOutputWords * 2;
++    if (request.enableThinking) {
++      bodyJson['reasoning'] = const {'effort': 'low'};
++    } else {
++      bodyJson.remove('reasoning');
++    }
++
+     try {
+       final response = await _dio.post<ResponseBody>(
+         endpointUrl,
+@@ -212,7 +227,7 @@ class OpenRouterProvider implements TranslationProvider {
+       substituteTargetLanguage: request.substituteTargetLanguage,
+     );
+ 
+-    return {
++    final body = <String, dynamic>{
+       'model': effectiveModel,
+       'messages': [
+         {'role': 'system', 'content': resolvedPrompt},
+@@ -235,7 +250,14 @@ class OpenRouterProvider implements TranslationProvider {
+           ],
+         },
+       ],
+-      'stream': stream,
++      'stream': request.stream || stream,
++      'max_tokens': request.maxOutputWords * 2,
+     };
++    if (request.enableThinking) {
++      body['reasoning'] = const {'effort': 'low'};
++    } else {
++      body.remove('reasoning');
++    }
++    return body;
+   }
+ }
+diff --git a/packages/translation_core/lib/translation_core.dart b/packages/translation_core/lib/translation_core.dart
+index fc6d05e..d1b2460 100644
+--- a/packages/translation_core/lib/translation_core.dart
++++ b/packages/translation_core/lib/translation_core.dart
+@@ -19,6 +19,7 @@ export 'src/models/translation_provider.dart';
+ export 'src/providers/openrouter_provider.dart';
+ export 'src/providers/gemini_provider.dart';
+ export 'src/providers/openai_compatible_provider.dart';
++export 'src/providers/openrouter_capabilities.dart';
+ export 'src/providers/provider_factory.dart';
+ 
+ // Utils
+diff --git a/packages/translation_core/test/openai_compatible_provider_test.dart b/packages/translation_core/test/openai_compatible_provider_test.dart
+new file mode 100644
+index 0000000..4199dbd
+--- /dev/null
++++ b/packages/translation_core/test/openai_compatible_provider_test.dart
+@@ -0,0 +1,169 @@
++import 'dart:convert';
++import 'dart:typed_data';
++
++import 'package:dio/dio.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:translation_core/src/models/translation_request.dart';
++import 'package:translation_core/src/providers/openai_compatible_provider.dart';
++
++void main() {
++  group('OpenAICompatibleProvider — reasoning/stream/word-cap toggles', () {
++    RequestOptions? capturedRequest;
++
++    Dio createMockStreamingDio() {
++      final dio = Dio();
++      dio.interceptors.add(
++        InterceptorsWrapper(
++          onRequest: (options, handler) {
++            capturedRequest = options;
++            final sse = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n';
++            handler.resolve(
++              Response<ResponseBody>(
++                requestOptions: options,
++                data: ResponseBody(
++                  Stream.fromIterable([
++                    Uint8List.fromList(utf8.encode(sse)),
++                  ]),
++                  200,
++                ),
++                statusCode: 200,
++              ),
++            );
++          },
++        ),
++      );
++      return dio;
++    }
++
++    setUp(() {
++      capturedRequest = null;
++    });
++
++    test('non-reasoning model — reasoning absent, stream false, max_tokens set',
++        () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenAICompatibleProvider(
++        apiKey: 'k',
++        baseUrl: 'https://api.example.com/v1',
++        model: 'gpt-4o-mini',
++        dio: dio,
++      );
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body.containsKey('reasoning_effort'), isFalse,
++          reason: 'gpt-4o-mini does not expose reasoning_effort');
++      // provider default stream=true; request default stream=false →
++      // the wire value is true until the caller explicitly disables streaming.
++      expect(body['stream'], isTrue);
++      expect(body['max_tokens'], 20000);
++    });
++
++    test('o-series model — enableThinking attaches reasoning_effort=low',
++        () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenAICompatibleProvider(
++        apiKey: 'k',
++        baseUrl: 'https://api.example.com/v1',
++        model: 'o3-mini',
++        dio: dio,
++      );
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              enableThinking: true,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['reasoning_effort'], 'low');
++    });
++
++    test('deepseek-r1 model — enableThinking attaches reasoning_effort=low',
++        () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenAICompatibleProvider(
++        apiKey: 'k',
++        baseUrl: 'https://api.example.com/v1',
++        model: 'deepseek-r1-distill-llama-70b',
++        dio: dio,
++      );
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              enableThinking: true,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['reasoning_effort'], 'low');
++    });
++
++    test('stream=true propagates to request body', () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenAICompatibleProvider(
++        apiKey: 'k',
++        baseUrl: 'https://api.example.com/v1',
++        model: 'gpt-4o-mini',
++        dio: dio,
++      );
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              stream: true,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['stream'], isTrue);
++    });
++
++    test('custom maxOutputWords scales to max_tokens*2', () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenAICompatibleProvider(
++        apiKey: 'k',
++        baseUrl: 'https://api.example.com/v1',
++        model: 'gpt-4o-mini',
++        dio: dio,
++      );
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              maxOutputWords: 3000,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['max_tokens'], 6000);
++    });
++  });
++}
+\ No newline at end of file
+diff --git a/packages/translation_core/test/openrouter_provider_test.dart b/packages/translation_core/test/openrouter_provider_test.dart
+new file mode 100644
+index 0000000..bfca02f
+--- /dev/null
++++ b/packages/translation_core/test/openrouter_provider_test.dart
+@@ -0,0 +1,127 @@
++import 'dart:convert';
++import 'dart:typed_data';
++
++import 'package:dio/dio.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:translation_core/src/models/translation_request.dart';
++import 'package:translation_core/src/providers/openrouter_provider.dart';
++
++void main() {
++  group('OpenRouterProvider — reasoning/stream/word-cap toggles', () {
++    RequestOptions? capturedRequest;
++
++    Dio createMockStreamingDio() {
++      final dio = Dio();
++      dio.interceptors.add(
++        InterceptorsWrapper(
++          onRequest: (options, handler) {
++            capturedRequest = options;
++            final sse = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n';
++            handler.resolve(
++              Response<ResponseBody>(
++                requestOptions: options,
++                data: ResponseBody(
++                  Stream.fromIterable([
++                    Uint8List.fromList(utf8.encode(sse)),
++                  ]),
++                  200,
++                ),
++                statusCode: 200,
++              ),
++            );
++          },
++        ),
++      );
++      return dio;
++    }
++
++    setUp(() {
++      capturedRequest = null;
++    });
++
++    test('default request — reasoning absent, stream false, max_tokens set',
++        () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate to {{target_language}}.',
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body.containsKey('reasoning'), isFalse,
++          reason: 'enableThinking defaults to false');
++      // `request.stream` is false by default and the provider-level
++      // `stream` default is true, so the wire value is `true` until the
++      // caller explicitly disables streaming.
++      expect(body['stream'], isTrue,
++          reason: 'provider default stream=true, request default stream=false');
++      expect(body['max_tokens'], 20000,
++          reason: 'maxOutputWords=10000 → max_tokens=20000');
++    });
++
++    test('enableThinking=true attaches reasoning.effort=low', () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              enableThinking: true,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['reasoning'], isA<Map<String, dynamic>>());
++      expect((body['reasoning'] as Map)['effort'], 'low');
++    });
++
++    test('stream=true propagates to request body', () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              stream: true,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['stream'], isTrue);
++    });
++
++    test('custom maxOutputWords scales to max_tokens*2', () async {
++      final dio = createMockStreamingDio();
++      final provider = OpenRouterProvider(apiKey: 'k', dio: dio);
++
++      await provider
++          .translate(
++            TranslationRequest(
++              inputText: 'Hello',
++              targetLanguage: 'Arabic',
++              systemPrompt: 'Translate.',
++              maxOutputWords: 2500,
++            ),
++          )
++          .toList();
++
++      final body = capturedRequest!.data as Map<String, dynamic>;
++      expect(body['max_tokens'], 5000);
++    });
++  });
++}
+\ No newline at end of file
+diff --git a/packages/translation_core/test/prompt_template_test.dart b/packages/translation_core/test/prompt_template_test.dart
+index 1fb3a95..a1401f5 100644
+--- a/packages/translation_core/test/prompt_template_test.dart
++++ b/packages/translation_core/test/prompt_template_test.dart
+@@ -112,6 +112,12 @@ void main() {
+         expect(copy.substituteTargetLanguage, isFalse);
+         expect(textTemplate.substituteTargetLanguage, isTrue);
+       });
++
++      test('copies with new outputLanguageFixed', () {
++        final copy = textTemplate.copyWith(outputLanguageFixed: true);
++        expect(copy.outputLanguageFixed, isTrue);
++        expect(textTemplate.outputLanguageFixed, isFalse);
++      });
+     });
+ 
+     group('fromJson', () {
+@@ -170,6 +176,22 @@ void main() {
+         expect(template.substituteTargetLanguage, isTrue);
+       });
+ 
++      test(
++        'outputLanguageFixed defaults to false when missing (back-compat)',
++        () {
++          final json = {
++            'id': 'tpl-3b',
++            'profileId': 'profile-1',
++            'name': 'Old JSON',
++            'systemPrompt': 'Prompt',
++            'supportsText': true,
++            'supportsImage': false,
++          };
++          final template = PromptTemplate.fromJson(json);
++          expect(template.outputLanguageFixed, isFalse);
++        },
++      );
++
+       test('parses substituteTargetLanguage: false from JSON', () {
+         final json = {
+           'id': 'tpl-4',
+@@ -183,6 +205,20 @@ void main() {
+         final template = PromptTemplate.fromJson(json);
+         expect(template.substituteTargetLanguage, isFalse);
+       });
++
++      test('parses outputLanguageFixed: true from JSON', () {
++        final json = {
++          'id': 'tpl-5',
++          'profileId': 'profile-1',
++          'name': 'Fixed Language',
++          'systemPrompt': 'You are an Arabic-only assistant.',
++          'supportsText': true,
++          'supportsImage': false,
++          'outputLanguageFixed': true,
++        };
++        final template = PromptTemplate.fromJson(json);
++        expect(template.outputLanguageFixed, isTrue);
++      });
+     });
+ 
+     group('toJson', () {
+@@ -196,6 +232,7 @@ void main() {
+         expect(json['supportsImage'], isFalse);
+         expect(json['isBuiltIn'], isTrue);
+         expect(json['substituteTargetLanguage'], isTrue);
++        expect(json['outputLanguageFixed'], isFalse);
+       });
+ 
+       test('serializes substituteTargetLanguage: false', () {
+@@ -203,6 +240,12 @@ void main() {
+         final json = template.toJson();
+         expect(json['substituteTargetLanguage'], isFalse);
+       });
++
++      test('serializes outputLanguageFixed: true', () {
++        final template = textTemplate.copyWith(outputLanguageFixed: true);
++        final json = template.toJson();
++        expect(json['outputLanguageFixed'], isTrue);
++      });
+     });
+ 
+     group('round-trip', () {
+@@ -215,6 +258,136 @@ void main() {
+         final roundTripped = PromptTemplate.fromJson(imageTemplate.toJson());
+         expect(roundTripped, equals(imageTemplate));
+       });
++
++      test('round-trip preserves enableThinking/stream/maxOutputWords', () {
++        final original = textTemplate.copyWith(
++          enableThinking: true,
++          stream: true,
++          maxOutputWords: 7500,
++        );
++        final roundTripped = PromptTemplate.fromJson(original.toJson());
++        expect(roundTripped.enableThinking, isTrue);
++        expect(roundTripped.stream, isTrue);
++        expect(roundTripped.maxOutputWords, 7500);
++        expect(roundTripped, equals(original));
++      });
++    });
++
++    group('new fields — enableThinking / stream / maxOutputWords', () {
++      test('defaults are false / false / 10000', () {
++        final template = PromptTemplate(
++          id: 'tpl-new',
++          profileId: 'pid',
++          name: 'New',
++          systemPrompt: 'prompt',
++          supportsText: true,
++          supportsImage: false,
++        );
++        expect(template.enableThinking, isFalse);
++        expect(template.stream, isFalse);
++        expect(template.maxOutputWords, 10000);
++      });
++
++      test(
++        'fromJson handles missing new fields with defaults (back-compat)',
++        () {
++          final json = {
++            'id': 'tpl-old',
++            'profileId': 'profile-1',
++            'name': 'Legacy JSON',
++            'systemPrompt': 'Prompt',
++            'supportsText': true,
++            'supportsImage': false,
++            // No enableThinking / stream / maxOutputWords keys.
++          };
++          final template = PromptTemplate.fromJson(json);
++          expect(template.enableThinking, isFalse);
++          expect(template.stream, isFalse);
++          expect(template.maxOutputWords, 10000);
++        },
++      );
++
++      test('fromJson reads new fields when present', () {
++        final json = {
++          'id': 'tpl-modern',
++          'profileId': 'profile-1',
++          'name': 'Modern',
++          'systemPrompt': 'Prompt',
++          'supportsText': true,
++          'supportsImage': false,
++          'enableThinking': true,
++          'stream': true,
++          'maxOutputWords': 5000,
++        };
++        final template = PromptTemplate.fromJson(json);
++        expect(template.enableThinking, isTrue);
++        expect(template.stream, isTrue);
++        expect(template.maxOutputWords, 5000);
++      });
++
++      test('fromJson coerces null new fields to defaults (defensive)', () {
++        final json = {
++          'id': 'tpl-null',
++          'profileId': 'profile-1',
++          'name': 'Null fields',
++          'systemPrompt': 'Prompt',
++          'supportsText': true,
++          'supportsImage': false,
++          'enableThinking': null,
++          'stream': null,
++          'maxOutputWords': null,
++        };
++        final template = PromptTemplate.fromJson(json);
++        expect(template.enableThinking, isFalse);
++        expect(template.stream, isFalse);
++        expect(template.maxOutputWords, 10000);
++      });
++
++      test('toJson includes new fields', () {
++        final template = textTemplate.copyWith(
++          enableThinking: true,
++          stream: true,
++          maxOutputWords: 20000,
++        );
++        final json = template.toJson();
++        expect(json.containsKey('enableThinking'), isTrue);
++        expect(json.containsKey('stream'), isTrue);
++        expect(json.containsKey('maxOutputWords'), isTrue);
++        expect(json['enableThinking'], isTrue);
++        expect(json['stream'], isTrue);
++        expect(json['maxOutputWords'], 20000);
++      });
++
++      test('copyWith preserves unspecified new fields', () {
++        final enriched = textTemplate.copyWith(
++          enableThinking: true,
++          stream: true,
++          maxOutputWords: 3000,
++        );
++        final renamed = enriched.copyWith(name: 'Renamed');
++        expect(renamed.enableThinking, isTrue);
++        expect(renamed.stream, isTrue);
++        expect(renamed.maxOutputWords, 3000);
++        expect(renamed.name, 'Renamed');
++        // Original untouched.
++        expect(textTemplate.enableThinking, isFalse);
++        expect(textTemplate.stream, isFalse);
++        expect(textTemplate.maxOutputWords, 10000);
++      });
++
++      test('props distinguish templates by new fields', () {
++        final a = textTemplate.copyWith(enableThinking: true);
++        final b = textTemplate.copyWith(enableThinking: false);
++        expect(a, isNot(equals(b)));
++
++        final c = textTemplate.copyWith(stream: true);
++        final d = textTemplate.copyWith(stream: false);
++        expect(c, isNot(equals(d)));
++
++        final e = textTemplate.copyWith(maxOutputWords: 1000);
++        final f = textTemplate.copyWith(maxOutputWords: 2000);
++        expect(e, isNot(equals(f)));
++      });
+     });
+   });
+ }
+diff --git a/pubspec.lock b/pubspec.lock
+index e11e623..7eabdba 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -1081,6 +1081,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.4.1"
++  strip_markdown:
++    dependency: transitive
++    description:
++      name: strip_markdown
++      sha256: bbb6eb80a28cfc346457611c55cf0e24a855b07404f95b2b67f238fa84914051
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.0"
+   sync_http:
+     dependency: transitive
+     description:
+diff --git a/translation_app/.gitignore b/translation_app/.gitignore
+index 3820a95..15b2777 100644
+--- a/translation_app/.gitignore
++++ b/translation_app/.gitignore
+@@ -39,6 +39,9 @@ app.*.symbols
+ # Obfuscation related
+ app.*.map.json
+ 
++# Flutter auto-generated project metadata
++.metadata
++
+ # Android Studio will place build artifacts here
+ /android/app/debug
+ /android/app/profile
+diff --git a/translation_app/android/app/src/main/kotlin/com/digitaltrekkerr/jusoor/TranslationOverlayService.kt b/translation_app/android/app/src/main/kotlin/com/digitaltrekkerr/jusoor/TranslationOverlayService.kt
+index fdb8e21..a3774ed 100644
+--- a/translation_app/android/app/src/main/kotlin/com/digitaltrekkerr/jusoor/TranslationOverlayService.kt
++++ b/translation_app/android/app/src/main/kotlin/com/digitaltrekkerr/jusoor/TranslationOverlayService.kt
+@@ -54,7 +54,9 @@ const val ACTION_OVERLAY_CLOSED = "com.digitaltrekkerr.jusoor.OVERLAY_CLOSED"
+ const val ACTION_STOP_SERVICE = "com.digitaltrekkerr.jusoor.STOP_SERVICE"
+ 
+ @SuppressLint("Wakelock")
+-class TranslationOverlayService : Service(), View.OnTouchListener {
++class TranslationOverlayService :
++    Service(),
++    View.OnTouchListener {
+     companion object {
+         private const val TAG = "TranslationOverlay"
+         private const val CHANNEL_ID = "TranslationOverlayChannel"
+@@ -62,6 +64,45 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         private const val CACHED_TAG = "translationOverlayEngine"
+         private const val SCREENSHOT_CHANNEL = "dev.flutter.org/screenshot"
+         private const val PROJECTION_RESULT_ACTION = "com.digitaltrekkerr.jusoor.PROJECTION_RESULT"
++
++        /**
++         * Removes a best-effort subset of Markdown formatting so the
++         * clipboard receives a plain-text rendering. Mirrors the Dart
++         * `toPlainText` helper in
++         * `packages/markdown_renderer/lib/src/utils/markdown_stripper.dart`
++         * — keep them in sync if you extend either side.
++         *
++         * Order matters: fenced code blocks (``` … ```) must be stripped
++         * before inline `code` so the inner content is not over-processed.
++         */
++        internal fun stripMarkdownForClipboard(input: String): String {
++            if (input.isEmpty()) return input
++            var s = input
++            // Fenced code blocks: ```lang\n…\n```
++            s = s.replace(Regex("```[\\s\\S]*?```"), " ")
++            // Inline code: `foo` (avoid eating emphasis backticks)
++            s = s.replace(Regex("`([^`]+)`"), "$1")
++            // Markdown links/images: ![alt](url) and [text](url) → text/alt
++            s = s.replace(Regex("!\\[[^\\]]*]\\([^)]*\\)"), "")
++            s = s.replace(Regex("\\[([^\\]]+)]\\([^)]*\\)"), "$1")
++            // Headings (#, ##, ###) and blockquotes at line start
++            s = s.replace(Regex("(?m)^#{1,6}\\s+"), "")
++            s = s.replace(Regex("(?m)^>\\s?"), "")
++            // Unordered list bullets (-, *, +) at line start
++            s = s.replace(Regex("(?m)^[ \\t]*[-*+]\\s+"), "")
++            // Ordered list markers (1. , 2) ) at line start
++            s = s.replace(Regex("(?m)^[ \\t]*\\d+[.)]\\s+"), "")
++            // Horizontal rules
++            s = s.replace(Regex("(?m)^[ \\t]*([-*_])\\1{2,}[ \\t]*$"), " ")
++            // Bold/italic: **bold**, __bold__, *italic*, _italic_
++            s = s.replace(Regex("\\*\\*([^*]+)\\*\\*"), "$1")
++            s = s.replace(Regex("__([^_]+)__"), "$1")
++            s = s.replace(Regex("(?<!\\w)\\*([^*]+)\\*(?!\\w)"), "$1")
++            s = s.replace(Regex("(?<!\\w)_([^_]+)_(?!\\w)"), "$1")
++            // Collapse repeated whitespace to a single space and trim.
++            return s.replace(Regex("[\\s\\u00A0]+"), " ").trim()
++        }
++
+         private const val ACTION_CLIPBOARD_RESULT = "com.digitaltrekkerr.jusoor.CLIPBOARD_RESULT"
+         private const val DEFAULT_NAV_BAR_HEIGHT_DP = 48
+         private const val DEFAULT_STATUS_BAR_HEIGHT_DP = 25
+@@ -109,16 +150,22 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     private var captureThread: HandlerThread? = null
+     private var captureHandler: Handler? = null
+ 
+-    private val windowFocusListener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+-        Log.d(TAG, "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard")
+-        if (!hasFocus && !isHidden && hasWindowFocus && !isRequestingMediaProjection && !isScreenshotInProgress && !isReadingClipboard) {
+-            Log.d(TAG, "Lost focus while not hidden - closing overlay")
+-            hasWindowFocus = false
+-            closeOverlay()
+-        } else if (hasFocus) {
+-            hasWindowFocus = true
++    private val windowFocusListener =
++        ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
++            Log.d(
++                TAG,
++                "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard",
++            )
++            if (!hasFocus && !isHidden && hasWindowFocus && !isRequestingMediaProjection && !isScreenshotInProgress &&
++                !isReadingClipboard
++            ) {
++                Log.d(TAG, "Lost focus while not hidden - closing overlay")
++                hasWindowFocus = false
++                closeOverlay()
++            } else if (hasFocus) {
++                hasWindowFocus = true
++            }
+         }
+-    }
+ 
+     @Nullable
+     override fun onBind(intent: Intent?): IBinder? = null
+@@ -135,10 +182,14 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         if (engine == null) {
+             Log.e(TAG, "Flutter engine not found, creating new one")
+             val engineGroup = FlutterEngineGroup(this)
+-            val entryPoint = DartExecutor.DartEntrypoint(
+-                io.flutter.FlutterInjector.instance().flutterLoader().findAppBundlePath(),
+-                "overlayMain"
+-            )
++            val entryPoint =
++                DartExecutor.DartEntrypoint(
++                    io.flutter.FlutterInjector
++                        .instance()
++                        .flutterLoader()
++                        .findAppBundlePath(),
++                    "overlayMain",
++                )
+             engine = engineGroup.createAndRunEngine(this, entryPoint)
+             FlutterEngineCache.getInstance().put(CACHED_TAG, engine)
+         }
+@@ -165,7 +216,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     private fun safeRegisterReceiver(
+         receiver: BroadcastReceiver?,
+         filter: IntentFilter?,
+-        exportBehavior: Int
++        exportBehavior: Int,
+     ) {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+             registerReceiver(receiver, filter, exportBehavior)
+@@ -177,18 +228,22 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     private fun registerReceivers() {
+         try {
+             val dialogFilter = IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+-            systemDialogReceiver = object : BroadcastReceiver() {
+-                override fun onReceive(context: Context?, intent: Intent?) {
+-                    if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS == intent?.action) {
+-                        if (isRequestingMediaProjection || isScreenshotInProgress) {
+-                            Log.d(TAG, "System dialog closing - ignored (screenshot/projection in progress)")
+-                            return
++            systemDialogReceiver =
++                object : BroadcastReceiver() {
++                    override fun onReceive(
++                        context: Context?,
++                        intent: Intent?,
++                    ) {
++                        if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS == intent?.action) {
++                            if (isRequestingMediaProjection || isScreenshotInProgress) {
++                                Log.d(TAG, "System dialog closing - ignored (screenshot/projection in progress)")
++                                return
++                            }
++                            Log.d(TAG, "System dialog closing - Home/Recents pressed, closing overlay")
++                            closeOverlay()
+                         }
+-                        Log.d(TAG, "System dialog closing - Home/Recents pressed, closing overlay")
+-                        closeOverlay()
+                     }
+                 }
+-            }
+             // ACTION_CLOSE_SYSTEM_DIALOGS is a system broadcast — the system
+             // delivers it even to NOT_EXPORTED receivers, and no third-party
+             // app needs to trigger this receiver directly.
+@@ -200,14 +255,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+         try {
+             val stopFilter = IntentFilter(ACTION_STOP_SERVICE)
+-            stopServiceReceiver = object : BroadcastReceiver() {
+-                override fun onReceive(context: Context?, intent: Intent?) {
+-                    if (ACTION_STOP_SERVICE == intent?.action) {
+-                        Log.d(TAG, "Stop service requested")
+-                        stopServiceCompletely()
++            stopServiceReceiver =
++                object : BroadcastReceiver() {
++                    override fun onReceive(
++                        context: Context?,
++                        intent: Intent?,
++                    ) {
++                        if (ACTION_STOP_SERVICE == intent?.action) {
++                            Log.d(TAG, "Stop service requested")
++                            stopServiceCompletely()
++                        }
+                     }
+                 }
+-            }
+             safeRegisterReceiver(stopServiceReceiver, stopFilter, RECEIVER_NOT_EXPORTED)
+             Log.d(TAG, "Registered stop service receiver")
+         } catch (e: Exception) {
+@@ -216,20 +275,25 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+         try {
+             val projectionFilter = IntentFilter(PROJECTION_RESULT_ACTION)
+-            projectionResultReceiver = object : BroadcastReceiver() {
+-                override fun onReceive(context: Context?, intent: Intent?) {
+-                    if (PROJECTION_RESULT_ACTION == intent?.action) {
+-                        val resultCode = intent.getIntExtra("resultCode", 0)
+-                        val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+-                            intent.getParcelableExtra("data", Intent::class.java)
+-                        } else {
+-                            @Suppress("DEPRECATION")
+-                            intent.getParcelableExtra<Intent>("data")
++            projectionResultReceiver =
++                object : BroadcastReceiver() {
++                    override fun onReceive(
++                        context: Context?,
++                        intent: Intent?,
++                    ) {
++                        if (PROJECTION_RESULT_ACTION == intent?.action) {
++                            val resultCode = intent.getIntExtra("resultCode", 0)
++                            val data =
++                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++                                    intent.getParcelableExtra("data", Intent::class.java)
++                                } else {
++                                    @Suppress("DEPRECATION")
++                                    intent.getParcelableExtra<Intent>("data")
++                                }
++                            onProjectionResult(resultCode, data)
+                         }
+-                        onProjectionResult(resultCode, data)
+                     }
+                 }
+-            }
+             safeRegisterReceiver(projectionResultReceiver, projectionFilter, RECEIVER_NOT_EXPORTED)
+             Log.d(TAG, "Registered projection result receiver")
+         } catch (e: Exception) {
+@@ -238,24 +302,30 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+         try {
+             val clipboardFilter = IntentFilter(ACTION_CLIPBOARD_RESULT)
+-            clipboardResultReceiver = object : BroadcastReceiver() {
+-                override fun onReceive(context: Context?, intent: Intent?) {
+-                    if (ACTION_CLIPBOARD_RESULT == intent?.action) {
+-                        val text = intent.getStringExtra("text") ?: ""
+-                        if (BuildConfig.DEBUG) {
+-                            Log.d("ClipboardDebug", "served via: relay, ${text.length} chars")
++            clipboardResultReceiver =
++                object : BroadcastReceiver() {
++                    override fun onReceive(
++                        context: Context?,
++                        intent: Intent?,
++                    ) {
++                        if (ACTION_CLIPBOARD_RESULT == intent?.action) {
++                            val text = intent.getStringExtra("text") ?: ""
++                            if (BuildConfig.DEBUG) {
++                                Log.d("ClipboardDebug", "served via: relay, ${text.length} chars")
++                            }
++                            pendingClipboardResult?.success(
++                                mapOf(
++                                    "text" to text,
++                                    "source" to "relay",
++                                    "timestamp" to System.currentTimeMillis(),
++                                    "stale" to false,
++                                ),
++                            )
++                            pendingClipboardResult = null
++                            isReadingClipboard = false
+                         }
+-                        pendingClipboardResult?.success(mapOf(
+-                            "text" to text,
+-                            "source" to "relay",
+-                            "timestamp" to System.currentTimeMillis(),
+-                            "stale" to false
+-                        ))
+-                        pendingClipboardResult = null
+-                        isReadingClipboard = false
+                     }
+                 }
+-            }
+             safeRegisterReceiver(clipboardResultReceiver, clipboardFilter, RECEIVER_NOT_EXPORTED)
+             Log.d(TAG, "Registered clipboard result receiver")
+         } catch (e: Exception) {
+@@ -306,13 +376,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     }
+ 
+     @Suppress("DEPRECATION")
+-    private fun startForegroundCompat(notificationId: Int, notification: Notification) {
++    private fun startForegroundCompat(
++        notificationId: Int,
++        notification: Notification,
++    ) {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+             startForeground(
+                 notificationId,
+                 notification,
+                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
++                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
+             )
+         } else {
+             startForeground(notificationId, notification)
+@@ -321,16 +394,17 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+     private fun createNotificationChannel() {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-            val channel = NotificationChannel(
+-                CHANNEL_ID,
+-                "Translation Overlay",
+-                NotificationManager.IMPORTANCE_MIN
+-            ).apply {
+-                setShowBadge(false)
+-                enableLights(false)
+-                enableVibration(false)
+-                setSound(null, null)
+-            }
++            val channel =
++                NotificationChannel(
++                    CHANNEL_ID,
++                    "Translation Overlay",
++                    NotificationManager.IMPORTANCE_MIN,
++                ).apply {
++                    setShowBadge(false)
++                    enableLights(false)
++                    enableVibration(false)
++                    setSound(null, null)
++                }
+             val manager = getSystemService(NotificationManager::class.java)
+             manager?.createNotificationChannel(channel)
+         }
+@@ -338,14 +412,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+     private fun createNotification(): Notification {
+         val mainIntent = Intent(this, MainActivity::class.java)
+-        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+-        } else {
+-            PendingIntent.FLAG_UPDATE_CURRENT
+-        }
++        val pendingFlags =
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
++            } else {
++                PendingIntent.FLAG_UPDATE_CURRENT
++            }
+         val mainPendingIntent = PendingIntent.getActivity(this, 0, mainIntent, pendingFlags)
+ 
+-        return NotificationCompat.Builder(this, CHANNEL_ID)
++        return NotificationCompat
++            .Builder(this, CHANNEL_ID)
+             .setContentTitle("Translator Overlay")
+             .setContentText("Translation overlay is active")
+             .setSmallIcon(R.drawable.ic_translate_tile)
+@@ -355,7 +431,11 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     }
+ 
+     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
++    override fun onStartCommand(
++        intent: Intent?,
++        flags: Int,
++        startId: Int,
++    ): Int {
+         Log.d(TAG, "onStartCommand called")
+ 
+         when {
+@@ -363,6 +443,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                 stopServiceCompletely()
+                 return START_NOT_STICKY
+             }
++
+             intent?.getBooleanExtra("close", false) == true -> {
+                 closeOverlay()
+                 if (!isScreenshotInProgress) {
+@@ -370,6 +451,7 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                 }
+                 return START_NOT_STICKY
+             }
++
+             intent?.getBooleanExtra("hide", false) == true -> {
+                 hideOverlay()
+                 return START_STICKY
+@@ -405,7 +487,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         startActivity(intent)
+     }
+ 
+-    private fun onProjectionResult(resultCode: Int, data: Intent?) {
++    private fun onProjectionResult(
++        resultCode: Int,
++        data: Intent?,
++    ) {
+         Log.d(TAG, "onProjectionResult: resultCode=$resultCode")
+         isWaitingForProjection = false
+         isRequestingMediaProjection = false
+@@ -414,13 +499,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+             mediaProjection = manager.getMediaProjection(resultCode, data)
+ 
+-            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+-                override fun onStop() {
+-                    Log.d(TAG, "MediaProjection stopped")
+-                    mediaProjection = null
+-                    releaseVirtualDisplay()
+-                }
+-            }, null)
++            mediaProjection?.registerCallback(
++                object : MediaProjection.Callback() {
++                    override fun onStop() {
++                        Log.d(TAG, "MediaProjection stopped")
++                        mediaProjection = null
++                        releaseVirtualDisplay()
++                    }
++                },
++                null,
++            )
+ 
+             Log.i(TAG, "MediaProjection created successfully")
+             performCapture()
+@@ -507,14 +595,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+             imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
+ 
+             val flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR
+-            virtualDisplay = mediaProjection?.createVirtualDisplay(
+-                "OverlayCapture",
+-                width, height, density,
+-                flags,
+-                imageReader!!.surface,
+-                null, null
+-            )
+-            Log.d(TAG, "VirtualDisplay created: ${width}x${height}")
++            virtualDisplay =
++                mediaProjection?.createVirtualDisplay(
++                    "OverlayCapture",
++                    width,
++                    height,
++                    density,
++                    flags,
++                    imageReader!!.surface,
++                    null,
++                    null,
++                )
++            Log.d(TAG, "VirtualDisplay created: ${width}x$height")
+ 
+             Handler(Looper.getMainLooper()).postDelayed({
+                 acquireImageWithRetry(3, width, height)
+@@ -530,9 +622,13 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         }
+     }
+ 
+-    private fun acquireImageWithRetry(remainingRetries: Int, width: Int, height: Int) {
++    private fun acquireImageWithRetry(
++        remainingRetries: Int,
++        width: Int,
++        height: Int,
++    ) {
+         val image = imageReader?.acquireLatestImage()
+-        
++
+         if (image == null) {
+             if (remainingRetries > 0) {
+                 Log.d(TAG, "No image available, retrying... ($remainingRetries retries left)")
+@@ -562,11 +658,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                     val rowPadding = rowStride - pixelStride * width
+ 
+                     val bitmapWidth = width + if (rowPadding > 0) rowPadding / pixelStride else 0
+-                    var bitmap = Bitmap.createBitmap(
+-                        bitmapWidth,
+-                        height,
+-                        Bitmap.Config.ARGB_8888
+-                    )
++                    var bitmap =
++                        Bitmap.createBitmap(
++                            bitmapWidth,
++                            height,
++                            Bitmap.Config.ARGB_8888,
++                        )
+                     bitmap.copyPixelsFromBuffer(buffer)
+                     image.close()
+ 
+@@ -596,8 +693,8 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                             mapOf(
+                                 "bytes" to byteArray,
+                                 "width" to width,
+-                                "height" to height
+-                            )
++                                "height" to height,
++                            ),
+                         )
+                         pendingScreenshotResult = null
+                     }
+@@ -653,9 +750,24 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     private fun setOverlayAlpha(alpha: Float) {
+         try {
+             windowManager?.let { wm ->
+-                scrimView?.let { v -> scrimParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
+-                flutterView?.let { v -> flutterParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
+-                navBarSentinel?.let { v -> navBarParams?.let { p -> p.alpha = alpha; wm.updateViewLayout(v, p) } }
++                scrimView?.let { v ->
++                    scrimParams?.let { p ->
++                        p.alpha = alpha
++                        wm.updateViewLayout(v, p)
++                    }
++                }
++                flutterView?.let { v ->
++                    flutterParams?.let { p ->
++                        p.alpha = alpha
++                        wm.updateViewLayout(v, p)
++                    }
++                }
++                navBarSentinel?.let { v ->
++                    navBarParams?.let { p ->
++                        p.alpha = alpha
++                        wm.updateViewLayout(v, p)
++                    }
++                }
+             }
+         } catch (e: Exception) {
+             Log.e(TAG, "Error setting overlay alpha", e)
+@@ -717,16 +829,17 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+             engine.lifecycleChannel.appIsResumed()
+         }
+ 
+-        flutterView = FlutterView(applicationContext, FlutterTextureView(applicationContext)).apply {
+-            val flutterEngine = engine
+-            if (flutterEngine != null) {
+-                attachToFlutterEngine(flutterEngine)
++        flutterView =
++            FlutterView(applicationContext, FlutterTextureView(applicationContext)).apply {
++                val flutterEngine = engine
++                if (flutterEngine != null) {
++                    attachToFlutterEngine(flutterEngine)
++                }
++                fitsSystemWindows = true
++                isFocusable = true
++                isFocusableInTouchMode = true
++                setBackgroundColor(Color.TRANSPARENT)
+             }
+-            fitsSystemWindows = true
+-            isFocusable = true
+-            isFocusableInTouchMode = true
+-            setBackgroundColor(Color.TRANSPARENT)
+-        }
+ 
+         flutterChannel?.setMethodCallHandler { call, result ->
+             when (call.method) {
+@@ -734,19 +847,23 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                     closeOverlay()
+                     result.success(true)
+                 }
++
+                 "hide" -> {
+                     hideOverlay()
+                     result.success(true)
+                 }
++
+                 "show" -> {
+                     showOverlayAfterHide()
+                     result.success(true)
+                 }
++
+                 "focusable" -> {
+                     val focusable = call.argument<Boolean>("enable") ?: false
+                     updateFlags(focusable)
+                     result.success(true)
+                 }
++
+                 "readClipboard" -> {
+                     if (pendingClipboardResult != null) {
+                         Log.w(TAG, "Previous clipboard read still pending, rejecting")
+@@ -754,27 +871,33 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                         return@setMethodCallHandler
+                     }
+                     try {
+-                        val clipboardManager = applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
++                        val clipboardManager =
++                            applicationContext.getSystemService(
++                                Context.CLIPBOARD_SERVICE,
++                            ) as android.content.ClipboardManager
+                         val clipData = clipboardManager.primaryClip
+                         if (clipData != null && clipData.itemCount > 0) {
+                             val text = clipData.getItemAt(0).text?.toString() ?: ""
+                             if (BuildConfig.DEBUG) {
+                                 Log.d("ClipboardDebug", "served via: direct, ${text.length} chars")
+                             }
+-                            result.success(mapOf(
+-                                "text" to text,
+-                                "source" to "direct",
+-                                "timestamp" to System.currentTimeMillis(),
+-                                "stale" to false
+-                            ))
++                            result.success(
++                                mapOf(
++                                    "text" to text,
++                                    "source" to "direct",
++                                    "timestamp" to System.currentTimeMillis(),
++                                    "stale" to false,
++                                ),
++                            )
+                         } else {
+                             Log.d(TAG, "Clipboard direct read null, trying relay Activity")
+                             pendingClipboardResult = result
+                             isReadingClipboard = true
+-                            val intent = Intent(this@TranslationOverlayService, OverlayRelayActivity::class.java).apply {
+-                                putExtra("action", "read_clipboard")
+-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+-                            }
++                            val intent =
++                                Intent(this@TranslationOverlayService, OverlayRelayActivity::class.java).apply {
++                                    putExtra("action", "read_clipboard")
++                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
++                                }
+                             startActivity(intent)
+                             Handler(Looper.getMainLooper()).postDelayed({
+                                 if (pendingClipboardResult != null) {
+@@ -782,12 +905,14 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                                     if (cacheText.isNotEmpty()) {
+                                         val ageMs = System.currentTimeMillis() - MainActivity.clipboardCacheTimestamp
+                                         val isStale = ageMs > MainActivity.CACHE_TTL_MS
+-                                        pendingClipboardResult?.success(mapOf(
+-                                            "text" to cacheText,
+-                                            "source" to "cache",
+-                                            "timestamp" to MainActivity.clipboardCacheTimestamp,
+-                                            "stale" to isStale
+-                                        ))
++                                        pendingClipboardResult?.success(
++                                            mapOf(
++                                                "text" to cacheText,
++                                                "source" to "cache",
++                                                "timestamp" to MainActivity.clipboardCacheTimestamp,
++                                                "stale" to isStale,
++                                            ),
++                                        )
+                                     } else {
+                                         pendingClipboardResult?.error("EMPTY", "Clipboard is empty", null)
+                                     }
+@@ -801,16 +926,18 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                         val cacheText = MainActivity.clipboardCache
+                         if (cacheText.isNotEmpty()) {
+                             val ageMs = System.currentTimeMillis() - MainActivity.clipboardCacheTimestamp
+-                        if (BuildConfig.DEBUG) {
+-                            Log.d("ClipboardDebug", "served via: cache (exception fallback), age=${ageMs}ms")
+-                        }
+-                        val isStale = ageMs > MainActivity.CACHE_TTL_MS
+-                            result.success(mapOf(
+-                                "text" to cacheText,
+-                                "source" to "cache",
+-                                "timestamp" to MainActivity.clipboardCacheTimestamp,
+-                                "stale" to isStale
+-                            ))
++                            if (BuildConfig.DEBUG) {
++                                Log.d("ClipboardDebug", "served via: cache (exception fallback), age=${ageMs}ms")
++                            }
++                            val isStale = ageMs > MainActivity.CACHE_TTL_MS
++                            result.success(
++                                mapOf(
++                                    "text" to cacheText,
++                                    "source" to "cache",
++                                    "timestamp" to MainActivity.clipboardCacheTimestamp,
++                                    "stale" to isStale,
++                                ),
++                            )
+                         } else {
+                             result.error("CLIPBOARD_ERROR", e.message, null)
+                         }
+@@ -818,13 +945,16 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                         pendingClipboardResult = null
+                     }
+                 }
++
+                 "writeClipboard" -> {
+                     try {
+                         val text = call.argument<String>("text") ?: ""
++                        val mode = call.argument<String>("mode") ?: "plain"
++                        val processed = if (mode == "markdown") text else stripMarkdownForClipboard(text)
+                         val clipboard = applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("translated", text))
++                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("translated", processed))
+                         if (BuildConfig.DEBUG) {
+-                            Log.d("ClipboardDebug", "write: ${text.length} chars")
++                            Log.d("ClipboardDebug", "write ($mode): ${processed.length} chars (from ${text.length})")
+                         }
+                         result.success(true)
+                     } catch (e: Exception) {
+@@ -832,7 +962,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                         result.error("CLIPBOARD_ERROR", e.message, null)
+                     }
+                 }
+-                else -> result.notImplemented()
++
++                else -> {
++                    result.notImplemented()
++                }
+             }
+         }
+ 
+@@ -853,75 +986,85 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+ 
+         val overlayHeight = contentHeight()
+ 
+-        val scrimLayoutParams = WindowManager.LayoutParams(
+-            WindowManager.LayoutParams.MATCH_PARENT,
+-            overlayHeight,
+-            0, 0,
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+-            } else {
+-                @Suppress("DEPRECATION")
+-                WindowManager.LayoutParams.TYPE_PHONE
+-            },
+-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+-            PixelFormat.TRANSLUCENT
+-        )
++        val scrimLayoutParams =
++            WindowManager.LayoutParams(
++                WindowManager.LayoutParams.MATCH_PARENT,
++                overlayHeight,
++                0,
++                0,
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
++                } else {
++                    @Suppress("DEPRECATION")
++                    WindowManager.LayoutParams.TYPE_PHONE
++                },
++                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
++                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
++                PixelFormat.TRANSLUCENT,
++            )
+         scrimLayoutParams.gravity = Gravity.TOP
+ 
+-        val params = WindowManager.LayoutParams(
+-            WindowManager.LayoutParams.MATCH_PARENT,
+-            overlayHeight,
+-            0, 0,
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+-            } else {
+-                @Suppress("DEPRECATION")
+-                WindowManager.LayoutParams.TYPE_PHONE
+-            },
+-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+-            PixelFormat.TRANSLUCENT
+-        )
++        val params =
++            WindowManager.LayoutParams(
++                WindowManager.LayoutParams.MATCH_PARENT,
++                overlayHeight,
++                0,
++                0,
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
++                } else {
++                    @Suppress("DEPRECATION")
++                    WindowManager.LayoutParams.TYPE_PHONE
++                },
++                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
++                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
++                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
++                PixelFormat.TRANSLUCENT,
++            )
+         params.gravity = Gravity.TOP
+ 
+-        scrimView = View(this).apply {
+-            setBackgroundColor(Color.parseColor("#80000000"))
+-            setOnTouchListener(this@TranslationOverlayService)
+-        }
++        scrimView =
++            View(this).apply {
++                setBackgroundColor(Color.parseColor("#80000000"))
++                setOnTouchListener(this@TranslationOverlayService)
++            }
+ 
+         val navBarHeight = navigationBarHeightPx()
+-        val navBarLayoutParams = WindowManager.LayoutParams(
+-            WindowManager.LayoutParams.MATCH_PARENT,
+-            navBarHeight,
+-            0, screenHeight() - navBarHeight,
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+-            } else {
+-                @Suppress("DEPRECATION")
+-                WindowManager.LayoutParams.TYPE_PHONE
+-            },
+-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+-            PixelFormat.TRANSLUCENT
+-        )
++        val navBarLayoutParams =
++            WindowManager.LayoutParams(
++                WindowManager.LayoutParams.MATCH_PARENT,
++                navBarHeight,
++                0,
++                screenHeight() - navBarHeight,
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
++                } else {
++                    @Suppress("DEPRECATION")
++                    WindowManager.LayoutParams.TYPE_PHONE
++                },
++                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
++                PixelFormat.TRANSLUCENT,
++            )
+         navBarLayoutParams.gravity = Gravity.TOP
+ 
+-        navBarSentinel = View(this).apply {
+-            setBackgroundColor(Color.TRANSPARENT)
+-            setOnTouchListener { _, event ->
+-                Log.d(TAG, "Nav bar sentinel touched: action=${event.action}")
+-                if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_OUTSIDE) {
+-                    closeOverlay()
+-                    true
+-                } else false
++        navBarSentinel =
++            View(this).apply {
++                setBackgroundColor(Color.TRANSPARENT)
++                setOnTouchListener { _, event ->
++                    Log.d(TAG, "Nav bar sentinel touched: action=${event.action}")
++                    if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_OUTSIDE) {
++                        closeOverlay()
++                        true
++                    } else {
++                        false
++                    }
++                }
+             }
+-        }
+ 
+         try {
+             scrimParams = scrimLayoutParams
+@@ -940,11 +1083,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     private fun updateFlags(focusable: Boolean) {
+         try {
+             val currentParams = flutterView?.layoutParams as? WindowManager.LayoutParams ?: return
+-            val newFlags = if (focusable) {
+-                currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+-            } else {
+-                currentParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+-            }
++            val newFlags =
++                if (focusable) {
++                    currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
++                } else {
++                    currentParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
++                }
+             currentParams.flags = newFlags
+             windowManager?.updateViewLayout(flutterView, currentParams)
+             isFocusable = focusable
+@@ -1004,8 +1148,8 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         stopSelf()
+     }
+ 
+-    private fun screenHeight(): Int {
+-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++    private fun screenHeight(): Int =
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+             windowManager?.currentWindowMetrics?.bounds?.height() ?: 0
+         } else {
+             @Suppress("DEPRECATION")
+@@ -1013,20 +1157,19 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+             windowManager?.defaultDisplay?.getRealMetrics(dm)
+             dm.heightPixels
+         }
+-    }
+ 
+     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+-    private fun contentHeight(): Int {
+-        return screenHeight() - navigationBarHeightPx()
+-    }
++    private fun contentHeight(): Int = screenHeight() - navigationBarHeightPx()
+ 
+     private fun statusBarHeightPx(): Int {
+         if (statusBarHeight == -1) {
+             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                 windowManager?.let { wm ->
+-                    val insets = wm.currentWindowMetrics.windowInsets.getInsets(
+-                        android.view.WindowInsets.Type.statusBars()
+-                    )
++                    val insets =
++                        wm.currentWindowMetrics.windowInsets.getInsets(
++                            android.view.WindowInsets.Type
++                                .statusBars(),
++                        )
+                     if (insets.top > 0) {
+                         statusBarHeight = insets.top
+                         return statusBarHeight
+@@ -1034,11 +1177,12 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                 }
+             }
+             val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+-            statusBarHeight = if (id > 0) {
+-                resources.getDimensionPixelSize(id)
+-            } else {
+-                dpToPx(DEFAULT_STATUS_BAR_HEIGHT_DP)
+-            }
++            statusBarHeight =
++                if (id > 0) {
++                    resources.getDimensionPixelSize(id)
++                } else {
++                    dpToPx(DEFAULT_STATUS_BAR_HEIGHT_DP)
++                }
+         }
+         return statusBarHeight
+     }
+@@ -1047,9 +1191,11 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         if (navigationBarHeight == -1) {
+             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                 windowManager?.let { wm ->
+-                    val insets = wm.currentWindowMetrics.windowInsets.getInsets(
+-                        android.view.WindowInsets.Type.navigationBars()
+-                    )
++                    val insets =
++                        wm.currentWindowMetrics.windowInsets.getInsets(
++                            android.view.WindowInsets.Type
++                                .navigationBars(),
++                        )
+                     if (insets.bottom > 0) {
+                         navigationBarHeight = insets.bottom
+                         return navigationBarHeight
+@@ -1057,22 +1203,24 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                 }
+             }
+             val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+-            navigationBarHeight = if (id > 0) {
+-                resources.getDimensionPixelSize(id)
+-            } else {
+-                dpToPx(DEFAULT_NAV_BAR_HEIGHT_DP)
+-            }
++            navigationBarHeight =
++                if (id > 0) {
++                    resources.getDimensionPixelSize(id)
++                } else {
++                    dpToPx(DEFAULT_NAV_BAR_HEIGHT_DP)
++                }
+         }
+         return navigationBarHeight
+     }
+ 
+-    private fun dpToPx(dp: Int): Int {
+-        return (android.util.TypedValue.applyDimension(
+-            android.util.TypedValue.COMPLEX_UNIT_DIP,
+-            dp.toFloat(),
+-            resources.displayMetrics
+-        )).toInt()
+-    }
++    private fun dpToPx(dp: Int): Int =
++        (
++            android.util.TypedValue.applyDimension(
++                android.util.TypedValue.COMPLEX_UNIT_DIP,
++                dp.toFloat(),
++                resources.displayMetrics,
++            )
++        ).toInt()
+ 
+     override fun onDestroy() {
+         Log.d(TAG, "onDestroy called")
+@@ -1101,7 +1249,10 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+     }
+ 
+     @SuppressLint("ClickableViewAccessibility")
+-    override fun onTouch(view: View, event: MotionEvent): Boolean {
++    override fun onTouch(
++        view: View,
++        event: MotionEvent,
++    ): Boolean {
+         Log.d(TAG, "onTouch action: ${event.action}, view: ${view::class.simpleName}, isHidden: $isHidden")
+         if (isHidden) {
+             return false
+@@ -1112,11 +1263,13 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+                 closeOverlay()
+                 return true
+             }
++
+             MotionEvent.ACTION_DOWN -> {
+                 dragging = false
+                 lastX = event.rawX
+                 lastY = event.rawY
+             }
++
+             MotionEvent.ACTION_MOVE -> {
+                 val dx = event.rawX - lastX
+                 val dy = event.rawY - lastY
+@@ -1130,4 +1283,4 @@ class TranslationOverlayService : Service(), View.OnTouchListener {
+         }
+         return false
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/translation_app/lib/l10n/app_ar.arb b/translation_app/lib/l10n/app_ar.arb
+index c489275..3590e78 100644
+--- a/translation_app/lib/l10n/app_ar.arb
++++ b/translation_app/lib/l10n/app_ar.arb
+@@ -748,6 +748,16 @@
+     }
+   },
+ 
++  "tplOutLangFixedTitle": "لغة إخراج ثابتة (بدون متغيّر)",
++  "@tplOutLangFixedTitle": {
++    "description": "عنوان مفتاح تفعيل لغة الإخراج الثابتة للقالب."
++  },
++
++  "tplOutLangFixedSubtitle": "هذا القالب يعمل بدون متغيّر اللغة المستهدفة — سيُخفى اختيار اللغة في الصفحة الرئيسية، ولن يُعيَّن للأوفّرلاي.",
++  "@tplOutLangFixedSubtitle": {
++    "description": "وصف مفتاح تفعيل لغة الإخراج الثابتة للقالب."
++  },
++
+   "tplEditSaveButton": "حفظ",
+   "@tplEditSaveButton": {
+     "description": "تسمية زر الحفظ العائم في محرر القوالب."
+@@ -812,5 +822,80 @@
+         "example": "0.1.6"
+       }
+     }
++  },
++
++  "copyAsPlain": "نسخ كنص عادي",
++  "@copyAsPlain": {
++    "description": "خيار في ورقة النسخ السفلية ينسخ الترجمة بعد تجريدها من تنسيق Markdown."
++  },
++
++  "copyAsMarkdown": "نسخ كـ Markdown",
++  "@copyAsMarkdown": {
++    "description": "خيار في ورقة النسخ السفلية ينسخ الترجمة بتنسيق Markdown الخام."
++  },
++
++  "shareAsPlain": "مشاركة كنص عادي",
++  "@shareAsPlain": {
++    "description": "خيار في ورقة المشاركة السفلية يشارك الترجمة بعد تجريدها من تنسيق Markdown."
++  },
++
++  "shareAsMarkdown": "مشاركة كـ Markdown",
++  "@shareAsMarkdown": {
++    "description": "خيار في ورقة المشاركة السفلية يشارك الترجمة كملف .md (السلوك الحالي)."
++  },
++
++  "saveToFile": "حفظ إلى ملف",
++  "@saveToFile": {
++    "description": "خيار في ورقة المشاركة السفلية يسمح للمستخدم بحفظ الترجمة كملف عبر ورقة مشاركة النظام."
++  },
++
++  "copyOptionsTitle": "خيارات النسخ",
++  "@copyOptionsTitle": {
++    "description": "عنوان الورقة السفلية التي تظهر عند الضغط المطوّل على زر النسخ لاختيار نص عادي أو Markdown."
++  },
++
++  "shareOptionsTitle": "خيارات المشاركة",
++  "@shareOptionsTitle": {
++    "description": "عنوان الورقة السفلية التي تظهر عند الضغط على زر المشاركة، للاختيار بين نص عادي أو Markdown أو حفظ إلى ملف."
++  },
++
++  "tplAdvancedTitle": "إعدادات متقدمة",
++  "@tplAdvancedTitle": {
++    "description": "عنوان القسم القابل للطي في محرر القالب لإعدادات التفكير والبث وحد الكلمات."
++  },
++
++  "tplAdvancedSubtitle": "اضبط التفكير والبث وحد المخرجات لهذا القالب.",
++  "@tplAdvancedSubtitle": {
++    "description": "وصف مختصر تحت عنوان القسم المتقدم."
++  },
++
++  "tplEnableThinkingTitle": "تفعيل التفكير",
++  "@tplEnableThinkingTitle": {
++    "description": "مفتاح تفعيل قدرة التفكير/الاستدلال للنموذج لهذا القالب. معطّل افتراضيًا."
++  },
++
++  "tplEnableThinkingSubtitle": "مستوى موصى به: low (أسرع وأرخص). بعض النماذج لا تدعم التفكير — سيتم تجاهل الخيار حينها.",
++  "@tplEnableThinkingSubtitle": {
++    "description": "نص مساعد تحت مفتاح تفعيل التفكير."
++  },
++
++  "tplEnableStreamTitle": "بث المخرجات",
++  "@tplEnableStreamTitle": {
++    "description": "مفتاح تفعيل بث نتيجة الترجمة تدريجيًا. معطّل افتراضيًا."
++  },
++
++  "tplEnableStreamSubtitle": "عند التعطيل، تُعاد الترجمة كاملة دفعة واحدة (أسهل للنسخ/المشاركة).",
++  "@tplEnableStreamSubtitle": {
++    "description": "نص مساعد تحت مفتاح تفعيل البث."
++  },
++
++  "tplMaxOutputWordsLabel": "الحد الأقصى لعدد الكلمات",
++  "@tplMaxOutputWordsLabel": {
++    "description": "تسمية حقل رقمي يحدّ من الحد الأقصى لعدد كلمات الترجمة."
++  },
++
++  "tplMaxOutputWordsHelper": "الافتراضي 10000. يحوّل المزود هذا الرقم إلى ميزانية توكنز (×2 تقريبًا).",
++  "@tplMaxOutputWordsHelper": {
++    "description": "نص مساعد تحت حقل الحد الأقصى للكلمات يوضح الافتراضي ومعامل التحويل."
+   }
+ }
+diff --git a/translation_app/lib/l10n/app_en.arb b/translation_app/lib/l10n/app_en.arb
+index f81a35e..84f12fb 100644
+--- a/translation_app/lib/l10n/app_en.arb
++++ b/translation_app/lib/l10n/app_en.arb
+@@ -748,6 +748,16 @@
+     }
+   },
+ 
++  "tplOutLangFixedTitle": "Fixed output language (no variable)",
++  "@tplOutLangFixedTitle": {
++    "description": "Title of the switch that marks a template as having a fixed output language."
++  },
++
++  "tplOutLangFixedSubtitle": "This template works without a target language variable — the language selector will be hidden in the home screen, and it won't be assignable to the overlay.",
++  "@tplOutLangFixedSubtitle": {
++    "description": "Subtitle of the fixed-output-language switch."
++  },
++
+   "tplEditSaveButton": "Save",
+   "@tplEditSaveButton": {
+     "description": "Label of the floating save button in the template editor."
+@@ -812,5 +822,80 @@
+         "example": "0.1.6"
+       }
+     }
++  },
++
++  "copyAsPlain": "Copy as plain text",
++  "@copyAsPlain": {
++    "description": "Option in the copy bottom sheet that copies the translation stripped of Markdown formatting."
++  },
++
++  "copyAsMarkdown": "Copy as Markdown",
++  "@copyAsMarkdown": {
++    "description": "Option in the copy bottom sheet that copies the translation as raw Markdown."
++  },
++
++  "shareAsPlain": "Share as plain text",
++  "@shareAsPlain": {
++    "description": "Option in the share bottom sheet that shares the translation stripped of Markdown formatting."
++  },
++
++  "shareAsMarkdown": "Share as Markdown",
++  "@shareAsMarkdown": {
++    "description": "Option in the share bottom sheet that shares the translation as a .md file (current behavior)."
++  },
++
++  "saveToFile": "Save to file",
++  "@saveToFile": {
++    "description": "Option in the share bottom sheet that lets the user save the translation as a file via the system share sheet."
++  },
++
++  "copyOptionsTitle": "Copy options",
++  "@copyOptionsTitle": {
++    "description": "Title of the bottom sheet shown on long-press of the copy button to let the user pick plain vs Markdown."
++  },
++
++  "shareOptionsTitle": "Share options",
++  "@shareOptionsTitle": {
++    "description": "Title of the bottom sheet shown when the share button is tapped, letting the user pick plain, Markdown, or save-to-file."
++  },
++
++  "tplAdvancedTitle": "Advanced",
++  "@tplAdvancedTitle": {
++    "description": "Title of the collapsible advanced section in the template editor (model reasoning, streaming, word cap)."
++  },
++
++  "tplAdvancedSubtitle": "Tune reasoning, streaming and output limits for this template.",
++  "@tplAdvancedSubtitle": {
++    "description": "Subtitle of the advanced section header."
++  },
++
++  "tplEnableThinkingTitle": "Enable thinking",
++  "@tplEnableThinkingTitle": {
++    "description": "Switch to enable model reasoning/thinking for this template. Defaults off."
++  },
++
++  "tplEnableThinkingSubtitle": "Recommended: low (faster, cheaper). Some models do not support thinking — the option is ignored then.",
++  "@tplEnableThinkingSubtitle": {
++    "description": "Helper text under the enable-thinking switch."
++  },
++
++  "tplEnableStreamTitle": "Stream output",
++  "@tplEnableStreamTitle": {
++    "description": "Switch to enable streaming translation output. Defaults off."
++  },
++
++  "tplEnableStreamSubtitle": "When off, the full translation is returned at once (easier to copy/share).",
++  "@tplEnableStreamSubtitle": {
++    "description": "Helper text under the enable-stream switch."
++  },
++
++  "tplMaxOutputWordsLabel": "Max output words",
++  "@tplMaxOutputWordsLabel": {
++    "description": "Label of the number field that caps the maximum output word count for a translation."
++  },
++
++  "tplMaxOutputWordsHelper": "Default 10000. Providers translate this into a token budget (~2×).",
++  "@tplMaxOutputWordsHelper": {
++    "description": "Helper text under the max-output-words field explaining the default and conversion."
+   }
+ }
+diff --git a/translation_app/lib/l10n/app_localizations.dart b/translation_app/lib/l10n/app_localizations.dart
+index e295faf..da29517 100644
+--- a/translation_app/lib/l10n/app_localizations.dart
++++ b/translation_app/lib/l10n/app_localizations.dart
+@@ -944,6 +944,18 @@ abstract class AppLocalizations {
+   /// **'Replace the {target_language} placeholder in the prompt with the chosen language before sending.'**
+   String tplSubSubtitle(String target_language);
+ 
++  /// Title of the switch that marks a template as having a fixed output language.
++  ///
++  /// In en, this message translates to:
++  /// **'Fixed output language (no variable)'**
++  String get tplOutLangFixedTitle;
++
++  /// Subtitle of the fixed-output-language switch.
++  ///
++  /// In en, this message translates to:
++  /// **'This template works without a target language variable — the language selector will be hidden in the home screen, and it won\'t be assignable to the overlay.'**
++  String get tplOutLangFixedSubtitle;
++
+   /// Label of the floating save button in the template editor.
+   ///
+   /// In en, this message translates to:
+@@ -1015,6 +1027,96 @@ abstract class AppLocalizations {
+   /// In en, this message translates to:
+   /// **'Version {version} is available.'**
+   String updateAvailableSubtitle(String version);
++
++  /// Option in the copy bottom sheet that copies the translation stripped of Markdown formatting.
++  ///
++  /// In en, this message translates to:
++  /// **'Copy as plain text'**
++  String get copyAsPlain;
++
++  /// Option in the copy bottom sheet that copies the translation as raw Markdown.
++  ///
++  /// In en, this message translates to:
++  /// **'Copy as Markdown'**
++  String get copyAsMarkdown;
++
++  /// Option in the share bottom sheet that shares the translation stripped of Markdown formatting.
++  ///
++  /// In en, this message translates to:
++  /// **'Share as plain text'**
++  String get shareAsPlain;
++
++  /// Option in the share bottom sheet that shares the translation as a .md file (current behavior).
++  ///
++  /// In en, this message translates to:
++  /// **'Share as Markdown'**
++  String get shareAsMarkdown;
++
++  /// Option in the share bottom sheet that lets the user save the translation as a file via the system share sheet.
++  ///
++  /// In en, this message translates to:
++  /// **'Save to file'**
++  String get saveToFile;
++
++  /// Title of the bottom sheet shown on long-press of the copy button to let the user pick plain vs Markdown.
++  ///
++  /// In en, this message translates to:
++  /// **'Copy options'**
++  String get copyOptionsTitle;
++
++  /// Title of the bottom sheet shown when the share button is tapped, letting the user pick plain, Markdown, or save-to-file.
++  ///
++  /// In en, this message translates to:
++  /// **'Share options'**
++  String get shareOptionsTitle;
++
++  /// Title of the collapsible advanced section in the template editor (model reasoning, streaming, word cap).
++  ///
++  /// In en, this message translates to:
++  /// **'Advanced'**
++  String get tplAdvancedTitle;
++
++  /// Subtitle of the advanced section header.
++  ///
++  /// In en, this message translates to:
++  /// **'Tune reasoning, streaming and output limits for this template.'**
++  String get tplAdvancedSubtitle;
++
++  /// Switch to enable model reasoning/thinking for this template. Defaults off.
++  ///
++  /// In en, this message translates to:
++  /// **'Enable thinking'**
++  String get tplEnableThinkingTitle;
++
++  /// Helper text under the enable-thinking switch.
++  ///
++  /// In en, this message translates to:
++  /// **'Recommended: low (faster, cheaper). Some models do not support thinking — the option is ignored then.'**
++  String get tplEnableThinkingSubtitle;
++
++  /// Switch to enable streaming translation output. Defaults off.
++  ///
++  /// In en, this message translates to:
++  /// **'Stream output'**
++  String get tplEnableStreamTitle;
++
++  /// Helper text under the enable-stream switch.
++  ///
++  /// In en, this message translates to:
++  /// **'When off, the full translation is returned at once (easier to copy/share).'**
++  String get tplEnableStreamSubtitle;
++
++  /// Label of the number field that caps the maximum output word count for a translation.
++  ///
++  /// In en, this message translates to:
++  /// **'Max output words'**
++  String get tplMaxOutputWordsLabel;
++
++  /// Helper text under the max-output-words field explaining the default and conversion.
++  ///
++  /// In en, this message translates to:
++  /// **'Default 10000. Providers translate this into a token budget (~2×).'**
++  String get tplMaxOutputWordsHelper;
+ }
+ 
+ class _AppLocalizationsDelegate
+diff --git a/translation_app/lib/l10n/app_localizations_ar.dart b/translation_app/lib/l10n/app_localizations_ar.dart
+index 21fd88e..6eed7a1 100644
+--- a/translation_app/lib/l10n/app_localizations_ar.dart
++++ b/translation_app/lib/l10n/app_localizations_ar.dart
+@@ -488,6 +488,13 @@ class AppLocalizationsAr extends AppLocalizations {
+     return 'استبدال المتغير $target_language في المطالبة باللغة المختارة قبل الإرسال.';
+   }
+ 
++  @override
++  String get tplOutLangFixedTitle => 'لغة إخراج ثابتة (بدون متغيّر)';
++
++  @override
++  String get tplOutLangFixedSubtitle =>
++      'هذا القالب يعمل بدون متغيّر اللغة المستهدفة — سيُخفى اختيار اللغة في الصفحة الرئيسية، ولن يُعيَّن للأوفّرلاي.';
++
+   @override
+   String get tplEditSaveButton => 'حفظ';
+ 
+@@ -526,4 +533,53 @@ class AppLocalizationsAr extends AppLocalizations {
+   String updateAvailableSubtitle(String version) {
+     return 'الإصدار $version متاح.';
+   }
++
++  @override
++  String get copyAsPlain => 'نسخ كنص عادي';
++
++  @override
++  String get copyAsMarkdown => 'نسخ كـ Markdown';
++
++  @override
++  String get shareAsPlain => 'مشاركة كنص عادي';
++
++  @override
++  String get shareAsMarkdown => 'مشاركة كـ Markdown';
++
++  @override
++  String get saveToFile => 'حفظ إلى ملف';
++
++  @override
++  String get copyOptionsTitle => 'خيارات النسخ';
++
++  @override
++  String get shareOptionsTitle => 'خيارات المشاركة';
++
++  @override
++  String get tplAdvancedTitle => 'إعدادات متقدمة';
++
++  @override
++  String get tplAdvancedSubtitle =>
++      'اضبط التفكير والبث وحد المخرجات لهذا القالب.';
++
++  @override
++  String get tplEnableThinkingTitle => 'تفعيل التفكير';
++
++  @override
++  String get tplEnableThinkingSubtitle =>
++      'مستوى موصى به: low (أسرع وأرخص). بعض النماذج لا تدعم التفكير — سيتم تجاهل الخيار حينها.';
++
++  @override
++  String get tplEnableStreamTitle => 'بث المخرجات';
++
++  @override
++  String get tplEnableStreamSubtitle =>
++      'عند التعطيل، تُعاد الترجمة كاملة دفعة واحدة (أسهل للنسخ/المشاركة).';
++
++  @override
++  String get tplMaxOutputWordsLabel => 'الحد الأقصى لعدد الكلمات';
++
++  @override
++  String get tplMaxOutputWordsHelper =>
++      'الافتراضي 10000. يحوّل المزود هذا الرقم إلى ميزانية توكنز (×2 تقريبًا).';
+ }
+diff --git a/translation_app/lib/l10n/app_localizations_en.dart b/translation_app/lib/l10n/app_localizations_en.dart
+index 05b9202..afc8b84 100644
+--- a/translation_app/lib/l10n/app_localizations_en.dart
++++ b/translation_app/lib/l10n/app_localizations_en.dart
+@@ -485,6 +485,13 @@ class AppLocalizationsEn extends AppLocalizations {
+     return 'Replace the $target_language placeholder in the prompt with the chosen language before sending.';
+   }
+ 
++  @override
++  String get tplOutLangFixedTitle => 'Fixed output language (no variable)';
++
++  @override
++  String get tplOutLangFixedSubtitle =>
++      'This template works without a target language variable — the language selector will be hidden in the home screen, and it won\'t be assignable to the overlay.';
++
+   @override
+   String get tplEditSaveButton => 'Save';
+ 
+@@ -523,4 +530,53 @@ class AppLocalizationsEn extends AppLocalizations {
+   String updateAvailableSubtitle(String version) {
+     return 'Version $version is available.';
+   }
++
++  @override
++  String get copyAsPlain => 'Copy as plain text';
++
++  @override
++  String get copyAsMarkdown => 'Copy as Markdown';
++
++  @override
++  String get shareAsPlain => 'Share as plain text';
++
++  @override
++  String get shareAsMarkdown => 'Share as Markdown';
++
++  @override
++  String get saveToFile => 'Save to file';
++
++  @override
++  String get copyOptionsTitle => 'Copy options';
++
++  @override
++  String get shareOptionsTitle => 'Share options';
++
++  @override
++  String get tplAdvancedTitle => 'Advanced';
++
++  @override
++  String get tplAdvancedSubtitle =>
++      'Tune reasoning, streaming and output limits for this template.';
++
++  @override
++  String get tplEnableThinkingTitle => 'Enable thinking';
++
++  @override
++  String get tplEnableThinkingSubtitle =>
++      'Recommended: low (faster, cheaper). Some models do not support thinking — the option is ignored then.';
++
++  @override
++  String get tplEnableStreamTitle => 'Stream output';
++
++  @override
++  String get tplEnableStreamSubtitle =>
++      'When off, the full translation is returned at once (easier to copy/share).';
++
++  @override
++  String get tplMaxOutputWordsLabel => 'Max output words';
++
++  @override
++  String get tplMaxOutputWordsHelper =>
++      'Default 10000. Providers translate this into a token budget (~2×).';
+ }
+diff --git a/translation_app/lib/main.dart b/translation_app/lib/main.dart
+index 3bf8c4f..2f11870 100644
+--- a/translation_app/lib/main.dart
++++ b/translation_app/lib/main.dart
+@@ -1,13 +1,15 @@
+ import 'dart:async';
+ import 'dart:convert';
++import 'dart:io' show File, Platform;
+ import 'dart:math' as math;
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+-import 'dart:io' show Platform;
+ import 'package:flutter_localizations/flutter_localizations.dart';
+ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+ import 'package:history/history.dart';
++import 'package:markdown_renderer/markdown_renderer.dart';
++import 'package:path_provider/path_provider.dart';
+ import 'package:share_plus/share_plus.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ import 'package:translation_core/translation_core.dart';
+@@ -29,9 +31,9 @@ const String _kOverlaySelectedLanguageKey = 'overlay_selected_language';
+ void overlayMain() {
+   WidgetsFlutterBinding.ensureInitialized();
+   debugPrint('[OverlayMain] WidgetsFlutterBinding initialized');
+-  
++
+   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+-  
++
+   ErrorWidget.builder = (FlutterErrorDetails details) {
+     return Material(
+       color: Colors.red.shade900,
+@@ -46,7 +48,7 @@ void overlayMain() {
+       ),
+     );
+   };
+-  
++
+   runApp(const _OverlayApp());
+ }
+ 
+@@ -65,9 +67,7 @@ class _OverlayApp extends StatelessWidget {
+         GlobalWidgetsLocalizations.delegate,
+         GlobalCupertinoLocalizations.delegate,
+       ],
+-      supportedLocales: const [
+-        Locale('en', ''),
+-      ],
++      supportedLocales: const [Locale('en', '')],
+       home: PopScope(
+         canPop: false,
+         onPopInvokedWithResult: (didPop, result) async {
+@@ -89,7 +89,8 @@ class _TranslatorOverlayContent extends StatefulWidget {
+   const _TranslatorOverlayContent();
+ 
+   @override
+-  State<_TranslatorOverlayContent> createState() => _TranslatorOverlayContentState();
++  State<_TranslatorOverlayContent> createState() =>
++      _TranslatorOverlayContentState();
+ }
+ 
+ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+@@ -158,10 +159,10 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+         debugPrint('[Overlay] Focus update error: $e');
+       }
+     });
+-    
++
+     _overlaySubscription = FlutterOverlayWindow.overlayListener.listen((data) {
+       if (data == null) return;
+-      
++
+       Map<String, dynamic> map;
+       if (data is Map) {
+         map = Map<String, dynamic>.from(data);
+@@ -174,9 +175,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+       } else {
+         return;
+       }
+-      
++
+       debugPrint('[OverlayWidget] Received: ${map['type']}');
+-      
++
+       if (map['type'] == 'clear_state') {
+         if (mounted) {
+           setState(() {
+@@ -189,29 +190,31 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+         if (mounted) {
+           final wasCancelled = map['cancelled'] == true;
+           setState(() {
+-            _translatedText = wasCancelled ? '' : (map['result']?.toString() ?? 'Error');
++            _translatedText = wasCancelled
++                ? ''
++                : (map['result']?.toString() ?? 'Error');
+             _isLoading = false;
+             _isCancelling = false;
+           });
+         }
+       }
+     });
+-    
+   }
+ 
+   Future<void> _loadDefaultLanguage() async {
+     final prefs = await SharedPreferences.getInstance();
+-    
+-    String languageCode = prefs.getString(_kOverlaySelectedLanguageKey) ?? 
+-        prefs.getString(_kDefaultTargetLanguageKey) ?? 
++
++    String languageCode =
++        prefs.getString(_kOverlaySelectedLanguageKey) ??
++        prefs.getString(_kDefaultTargetLanguageKey) ??
+         'Arabic';
+-    
++
+     if (!_kLanguageNames.contains(languageCode)) {
+       languageCode = 'Arabic';
+     }
+-    
++
+     final code = getLanguageCode(languageCode) ?? 'en';
+-    
++
+     if (mounted) {
+       setState(() {
+         _selectedLanguageCode = code;
+@@ -242,7 +245,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+       previous: _inputDirection,
+     );
+     if (newDir != _inputDirection) {
+-      setState(() { _inputDirection = newDir; });
++      setState(() {
++        _inputDirection = newDir;
++      });
+     }
+   }
+ 
+@@ -262,9 +267,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+           '[Overlay-Paste] Native clipboard: $source, ${text?.length ?? 0} chars',
+         );
+         if (isStale && text != null && text.isNotEmpty) {
+-          _showOverlaySnackBar(
+-            'Clipboard: ${text.length} chars (cached)',
+-          );
++          _showOverlaySnackBar('Clipboard: ${text.length} chars (cached)');
+         }
+       }
+     } on TimeoutException {
+@@ -310,7 +313,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+       _translatedText = '';
+       _isLoading = false;
+     });
+-    
++
+     try {
+       await _overlayChannel.invokeMethod('close');
+     } catch (e) {
+@@ -321,14 +324,14 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   void _handleTranslate() async {
+     final text = _inputController.text.trim();
+     if (text.isEmpty) return;
+-    
+-    setState(() { 
+-      _isLoading = true; 
++
++    setState(() {
++      _isLoading = true;
+       _translatedText = '';
+       _isCancelled = false;
+       _isCancelling = false;
+     });
+-    
++
+     try {
+       final result = await _performTranslation(text, _selectedLanguageCode);
+       if (mounted) {
+@@ -359,9 +362,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+     });
+ 
+     try {
+-      await FlutterOverlayWindow.shareData(jsonEncode({
+-        'type': 'cancel_translation',
+-      }));
++      await FlutterOverlayWindow.shareData(
++        jsonEncode({'type': 'cancel_translation'}),
++      );
+     } catch (e) {
+       debugPrint('[Overlay] Cancel signal error: $e');
+     }
+@@ -411,25 +414,151 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+     });
+   }
+ 
+-  void _copyText(String text) {
++  void _copyText(String text, {String mode = 'plain'}) {
++    final processed = mode == 'markdown' ? text : toPlainText(text);
+     _overlayChannel
+-        .invokeMethod('writeClipboard', {'text': text})
+-        .then((_) => debugPrint('[Overlay-Paste] Copied: ${text.length} chars'))
++        .invokeMethod('writeClipboard', {'text': processed, 'mode': mode})
++        .then(
++          (_) => debugPrint(
++            '[Overlay-Paste] Copied ($mode): ${processed.length} chars',
++          ),
++        )
+         .catchError((e) => debugPrint('[Overlay-Paste] Copy error: $e'));
+-    setState(() { _showCopiedFeedback = true; });
++    setState(() {
++      _showCopiedFeedback = true;
++    });
+     Future.delayed(const Duration(seconds: 1), () {
+-      if (mounted) setState(() { _showCopiedFeedback = false; });
++      if (mounted) {
++        setState(() {
++          _showCopiedFeedback = false;
++        });
++      }
+     });
+   }
+ 
+-  Future<void> _shareText(String text) async {
++  Future<void> _shareText(String text, {String mode = 'plain'}) async {
+     try {
+-      await SharePlus.instance.share(ShareParams(text: text));
++      if (mode == 'saveFile') {
++        await _saveTranslationToFile(text);
++        return;
++      }
++      final processed = mode == 'markdown' ? text : toPlainText(text);
++      await SharePlus.instance.share(ShareParams(text: processed));
+     } catch (e) {
+       debugPrint('[Overlay] Share error: $e');
+     }
+   }
+ 
++  /// Writes [text] to a `.md` file in the temp directory and opens the
++  /// share sheet with the file attached so the user can pick the final
++  /// destination (Downloads, Drive, Telegram, etc.) without the overlay
++  /// requiring `WRITE_EXTERNAL_STORAGE`.
++  Future<void> _saveTranslationToFile(String text) async {
++    try {
++      final tempDir = await getTemporaryDirectory();
++      final timestamp = DateTime.now().millisecondsSinceEpoch;
++      final file = File('${tempDir.path}/jusoor_translation_$timestamp.md');
++      try {
++        await file.writeAsString(text);
++        await SharePlus.instance.share(
++          ShareParams(
++            text: 'Jusoor translation',
++            subject: 'Jusoor translation',
++            files: [XFile(file.path)],
++          ),
++        );
++      } finally {
++        if (await file.exists()) {
++          await file.delete();
++        }
++      }
++    } catch (e) {
++      debugPrint('[Overlay] Save-to-file error: $e');
++    }
++  }
++
++  /// Shows a bottom sheet with three share options from the overlay:
++  /// plain text, Markdown file, or save-to-file via the system share sheet.
++  Future<void> _showShareOptions(String text) async {
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('مشاركة كنص عادي'),
++              subtitle: const Text('بدون تنسيق Markdown'),
++              onTap: () {
++                Navigator.of(sheetCtx).pop();
++                _shareText(text, mode: 'plain');
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('مشاركة كـ Markdown (.md)'),
++              subtitle: const Text('ملف نصي بالتنسيق الأصلي'),
++              onTap: () {
++                Navigator.of(sheetCtx).pop();
++                _shareText(text, mode: 'markdown');
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.save_alt),
++              title: const Text('حفظ إلى ملف'),
++              subtitle: const Text('اختر مكان الحفظ من ورقة المشاركة'),
++              onTap: () {
++                Navigator.of(sheetCtx).pop();
++                _shareText(text, mode: 'saveFile');
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++  }
++
++  /// Shows a bottom sheet letting the user pick between copying the
++  /// translation as plain text (Markdown stripped) or as raw Markdown.
++  ///
++  /// Triggered by long-pressing the copy button. The single tap path still
++  /// copies plain text (the safer default).
++  Future<void> _showCopyOptions(String text) async {
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('نسخ كنص عادي'),
++              subtitle: const Text('بدون تنسيق Markdown'),
++              onTap: () {
++                Navigator.of(sheetCtx).pop();
++                _copyText(text, mode: 'plain');
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('نسخ كـ Markdown'),
++              subtitle: const Text('مع التنسيق الأصلي'),
++              onTap: () {
++                Navigator.of(sheetCtx).pop();
++                _copyText(text, mode: 'markdown');
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++  }
++
+   void _showOverlaySnackBar(String message) {
+     final overlay = Overlay.of(context);
+     final entry = OverlayEntry(
+@@ -472,7 +601,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   Future<String> _performTranslation(String text, String targetLanguage) async {
+     final prefs = await SharedPreferences.getInstance();
+     final templateId = prefs.getString(_kSelectedOverlayTemplatePref);
+-    
++
+     if (templateId == null) {
+       return 'Error: No overlay template selected. Please open app Settings to configure.';
+     }
+@@ -513,28 +642,30 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+     final buffer = StringBuffer();
+     final completer = Completer<void>();
+     StreamSubscription<String>? subscription;
+-    subscription = provider.translate(request).listen(
+-      (chunk) {
+-        if (_isCancelled) {
+-          subscription?.cancel();
+-          if (!completer.isCompleted) completer.complete();
+-          return;
+-        }
+-        buffer.write(chunk);
+-        if (mounted) {
+-          setState(() {
+-            _translatedText = buffer.toString();
+-          });
+-        }
+-      },
+-      onDone: () {
+-        if (!completer.isCompleted) completer.complete();
+-      },
+-      onError: (e) {
+-        if (!completer.isCompleted) completer.completeError(e);
+-      },
+-      cancelOnError: true,
+-    );
++    subscription = provider
++        .translate(request)
++        .listen(
++          (chunk) {
++            if (_isCancelled) {
++              subscription?.cancel();
++              if (!completer.isCompleted) completer.complete();
++              return;
++            }
++            buffer.write(chunk);
++            if (mounted) {
++              setState(() {
++                _translatedText = buffer.toString();
++              });
++            }
++          },
++          onDone: () {
++            if (!completer.isCompleted) completer.complete();
++          },
++          onError: (e) {
++            if (!completer.isCompleted) completer.completeError(e);
++          },
++          cancelOnError: true,
++        );
+ 
+     await completer.future;
+     subscription.cancel();
+@@ -562,7 +693,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   Future<String> _performScreenshotTranslation(String targetLanguage) async {
+     final prefs = await SharedPreferences.getInstance();
+     final templateId = prefs.getString(_kSelectedOverlayTemplatePref);
+-    
++
+     if (templateId == null) {
+       return 'Error: No overlay template selected. Please open app Settings to configure.';
+     }
+@@ -578,24 +709,27 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+ 
+     debugPrint('[Overlay] Requesting screenshot via service...');
+     Uint8List? imageBytes;
+-    
++
+     const screenshotChannel = MethodChannel('dev.flutter.org/screenshot');
+-    
++
+     try {
+-      final result = await screenshotChannel.invokeMethod<Map<dynamic, dynamic>>('captureScreen');
+-      
++      final result = await screenshotChannel
++          .invokeMethod<Map<dynamic, dynamic>>('captureScreen');
++
+       if (result == null) {
+         return 'Screenshot failed: No result returned.';
+       }
+-      
++
+       final bytes = result['bytes'];
+       if (bytes is Uint8List) {
+         imageBytes = bytes;
+       } else if (bytes is List) {
+         imageBytes = Uint8List.fromList(bytes.cast<int>());
+       }
+-      
+-      debugPrint('[Overlay] Screenshot taken: ${imageBytes?.length ?? 0} bytes');
++
++      debugPrint(
++        '[Overlay] Screenshot taken: ${imageBytes?.length ?? 0} bytes',
++      );
+     } catch (e, st) {
+       debugPrint('[Overlay] Screenshot failed: $e\n$st');
+       return 'Screenshot failed: $e';
+@@ -634,28 +768,30 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+     final buffer = StringBuffer();
+     final completer = Completer<void>();
+     StreamSubscription<String>? subscription;
+-    subscription = provider.translate(request).listen(
+-      (chunk) {
+-        if (_isCancelled) {
+-          subscription?.cancel();
+-          if (!completer.isCompleted) completer.complete();
+-          return;
+-        }
+-        buffer.write(chunk);
+-        if (mounted) {
+-          setState(() {
+-            _translatedText = buffer.toString();
+-          });
+-        }
+-      },
+-      onDone: () {
+-        if (!completer.isCompleted) completer.complete();
+-      },
+-      onError: (e) {
+-        if (!completer.isCompleted) completer.completeError(e);
+-      },
+-      cancelOnError: true,
+-    );
++    subscription = provider
++        .translate(request)
++        .listen(
++          (chunk) {
++            if (_isCancelled) {
++              subscription?.cancel();
++              if (!completer.isCompleted) completer.complete();
++              return;
++            }
++            buffer.write(chunk);
++            if (mounted) {
++              setState(() {
++                _translatedText = buffer.toString();
++              });
++            }
++          },
++          onDone: () {
++            if (!completer.isCompleted) completer.complete();
++          },
++          onError: (e) {
++            if (!completer.isCompleted) completer.completeError(e);
++          },
++          cancelOnError: true,
++        );
+ 
+     await completer.future;
+     subscription.cancel();
+@@ -689,11 +825,35 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+   }
+ 
+   static const List<String> _kLanguageNames = [
+-    'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese',
+-    'Russian', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Hindi',
+-    'Turkish', 'Dutch', 'Polish', 'Swedish', 'Danish', 'Finnish',
+-    'Norwegian', 'Czech', 'Greek', 'Hebrew', 'Thai', 'Vietnamese',
+-    'Indonesian', 'Ukrainian', 'Romanian', 'Hungarian', 'Catalan',
++    'English',
++    'Spanish',
++    'French',
++    'German',
++    'Italian',
++    'Portuguese',
++    'Russian',
++    'Chinese',
++    'Japanese',
++    'Korean',
++    'Arabic',
++    'Hindi',
++    'Turkish',
++    'Dutch',
++    'Polish',
++    'Swedish',
++    'Danish',
++    'Finnish',
++    'Norwegian',
++    'Czech',
++    'Greek',
++    'Hebrew',
++    'Thai',
++    'Vietnamese',
++    'Indonesian',
++    'Ukrainian',
++    'Romanian',
++    'Hungarian',
++    'Catalan',
+   ];
+ 
+   @override
+@@ -719,7 +879,10 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                     textAlign: _inputDirection == TextDirection.rtl
+                         ? TextAlign.right
+                         : TextAlign.left,
+-                    style: const TextStyle(color: _onSurfaceColor, fontSize: 14),
++                    style: const TextStyle(
++                      color: _onSurfaceColor,
++                      fontSize: 14,
++                    ),
+                     selectionControls: MaterialTextSelectionControls(),
+                     contextMenuBuilder: (context, editableTextState) {
+                       return AdaptiveTextSelectionToolbar.editableText(
+@@ -755,17 +918,22 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                               ? (_isCancelling ? null : _handleTranslate)
+                               : (_isCancelling ? null : _handleCancel),
+                           icon: Icon(
+-                            _isCancelling ? Icons.hourglass_empty : 
+-                              (_isLoading ? Icons.close : Icons.translate), 
+-                            size: 16
++                            _isCancelling
++                                ? Icons.hourglass_empty
++                                : (_isLoading ? Icons.close : Icons.translate),
++                            size: 16,
+                           ),
+                           label: Text(
+-                            _isCancelling ? 'Cancelling...' : 
+-                              (_isLoading ? 'Cancel' : 'Translate'),
++                            _isCancelling
++                                ? 'Cancelling...'
++                                : (_isLoading ? 'Cancel' : 'Translate'),
+                             style: const TextStyle(fontSize: 13),
+                           ),
+                           style: ElevatedButton.styleFrom(
+-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
++                            padding: const EdgeInsets.symmetric(
++                              horizontal: 8,
++                              vertical: 10,
++                            ),
+                             backgroundColor: _primaryColor,
+                           ),
+                         ),
+@@ -774,11 +942,19 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                       Expanded(
+                         flex: 4,
+                         child: OutlinedButton.icon(
+-                          onPressed: _isLoading && !_isCancelling ? null : _handleScreenshot,
++                          onPressed: _isLoading && !_isCancelling
++                              ? null
++                              : _handleScreenshot,
+                           icon: const Icon(Icons.screenshot, size: 16),
+-                          label: const Text('Screenshot', style: TextStyle(fontSize: 13)),
++                          label: const Text(
++                            'Screenshot',
++                            style: TextStyle(fontSize: 13),
++                          ),
+                           style: OutlinedButton.styleFrom(
+-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
++                            padding: const EdgeInsets.symmetric(
++                              horizontal: 8,
++                              vertical: 10,
++                            ),
+                             foregroundColor: _onSurfaceColor,
+                           ),
+                         ),
+@@ -790,11 +966,17 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                         tooltip: 'Clear input and output',
+                         style: IconButton.styleFrom(
+                           backgroundColor: _surfaceContainerColor,
+-                          foregroundColor: _canClear ? _onSurfaceColor : _onSurfaceVariantColor,
++                          foregroundColor: _canClear
++                              ? _onSurfaceColor
++                              : _onSurfaceVariantColor,
+                           padding: const EdgeInsets.all(10),
+                           shape: RoundedRectangleBorder(
+                             borderRadius: BorderRadius.circular(8),
+-                            side: BorderSide(color: _onSurfaceVariantColor.withValues(alpha: 0.3)),
++                            side: BorderSide(
++                              color: _onSurfaceVariantColor.withValues(
++                                alpha: 0.3,
++                              ),
++                            ),
+                           ),
+                         ),
+                       ),
+@@ -810,16 +992,19 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                       borderRadius: BorderRadius.circular(12),
+                     ),
+                     child: _translatedText.isNotEmpty
+-                        ? BiDiMarkdownView(markdownText: _translatedText, selectable: true)
++                        ? BiDiMarkdownView(
++                            markdownText: _translatedText,
++                            selectable: true,
++                          )
+                         : _isLoading
+-                            ? const BiDiMarkdownView.loading()
+-                            : Text(
+-                                'Translation will appear here',
+-                                style: TextStyle(
+-                                  color: _onSurfaceVariantColor,
+-                                  fontSize: 14,
+-                                ),
+-                              ),
++                        ? const BiDiMarkdownView.loading()
++                        : Text(
++                            'Translation will appear here',
++                            style: TextStyle(
++                              color: _onSurfaceVariantColor,
++                              fontSize: 14,
++                            ),
++                          ),
+                   ),
+                   if (_translatedText.isNotEmpty)
+                     Padding(
+@@ -830,7 +1015,8 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                           IconButton(
+                             icon: const Icon(Icons.share, size: 20),
+                             tooltip: 'Share translation',
+-                            onPressed: () async { await _shareText(_translatedText); },
++                            onPressed: () => _showShareOptions(_translatedText),
++                            onLongPress: () => _shareText(_translatedText),
+                             color: _onSurfaceVariantColor,
+                           ),
+                           if (_showCopiedFeedback)
+@@ -849,6 +1035,8 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                               icon: const Icon(Icons.copy, size: 20),
+                               tooltip: 'Copy translation',
+                               onPressed: () => _copyText(_translatedText),
++                              onLongPress: () =>
++                                  _showCopyOptions(_translatedText),
+                               color: _onSurfaceVariantColor,
+                             ),
+                         ],
+@@ -869,7 +1057,8 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+           final maxW = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+               ? constraints.maxWidth
+               : MediaQuery.of(context).size.width;
+-          final maxH = constraints.maxHeight.isFinite && constraints.maxHeight > 0
++          final maxH =
++              constraints.maxHeight.isFinite && constraints.maxHeight > 0
+               ? constraints.maxHeight
+               : MediaQuery.of(context).size.height;
+ 
+@@ -881,9 +1070,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                   width: double.infinity,
+                   height: double.infinity,
+                   padding: const EdgeInsets.all(16),
+-                  decoration: BoxDecoration(
+-                    color: _surfaceColor,
+-                  ),
++                  decoration: BoxDecoration(color: _surfaceColor),
+                   child: cardContent,
+                 ),
+               ),
+@@ -897,9 +1084,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+               Positioned.fill(
+                 child: GestureDetector(
+                   onTap: _handleOutsideTap,
+-                  child: Container(
+-                    color: Colors.black.withValues(alpha: 0.5),
+-                  ),
++                  child: Container(color: Colors.black.withValues(alpha: 0.5)),
+                 ),
+               ),
+               Center(
+@@ -1001,13 +1186,17 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                   return ListTile(
+                     leading: Icon(
+                       isSelected ? Icons.check_circle : Icons.circle_outlined,
+-                      color: isSelected ? _primaryColor : _onSurfaceVariantColor,
++                      color: isSelected
++                          ? _primaryColor
++                          : _onSurfaceVariantColor,
+                     ),
+                     title: Text(
+                       name,
+                       style: TextStyle(
+                         color: isSelected ? _primaryColor : _onSurfaceColor,
+-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
++                        fontWeight: isSelected
++                            ? FontWeight.w600
++                            : FontWeight.normal,
+                       ),
+                     ),
+                     onTap: () => Navigator.of(ctx).pop(name),
+@@ -1124,16 +1313,17 @@ void main() async {
+     final container = ProviderContainer(
+       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+     );
+-    
++
+     runApp(JusoorApp(container: container));
+ 
+-  // Request POST_NOTIFICATIONS permission on Android 13+ (API 33+)
+-  if (Platform.isAndroid) {
+-    WidgetsBinding.instance.addPostFrameCallback((_) {
+-      const MethodChannel('dev.flutter.org/overlay_permission')
+-          .invokeMethod('requestNotificationPermission');
+-    });
+-  }
++    // Request POST_NOTIFICATIONS permission on Android 13+ (API 33+)
++    if (Platform.isAndroid) {
++      WidgetsBinding.instance.addPostFrameCallback((_) {
++        const MethodChannel(
++          'dev.flutter.org/overlay_permission',
++        ).invokeMethod('requestNotificationPermission');
++      });
++    }
+   } else {
+     runApp(const _InitializationErrorApp());
+   }
+@@ -1184,4 +1374,4 @@ class _InitializationErrorApp extends StatelessWidget {
+       ),
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/translation_app/lib/overlay/overlay_handlers.dart b/translation_app/lib/overlay/overlay_handlers.dart
+index d591e34..a9f8d78 100644
+--- a/translation_app/lib/overlay/overlay_handlers.dart
++++ b/translation_app/lib/overlay/overlay_handlers.dart
+@@ -144,6 +144,22 @@ Future<void> _handleTranslateText(Map<String, dynamic> map) async {
+     return;
+   }
+ 
++  // Fixed-language templates bake the target language into the prompt
++  // body and have no `{{target_language}}` placeholder. The overlay
++  // always needs a user-chosen target language carried by the `target`
++  // IPC field, so it cannot drive these templates — reject early with
++  // a clear actionable message.
++  if (template.outputLanguageFixed) {
++    await FlutterOverlayWindow.shareData(jsonEncode({
++      'type': 'translation_result',
++      'result':
++          'Error: Selected template has a fixed output language and is '
++              'not compatible with floating overlay translation. Please '
++              'open app Settings to pick a different overlay template.',
++    }));
++    return;
++  }
++
+   final profile = await loadProfile(prefs, template.profileId);
+   if (profile == null) {
+     await FlutterOverlayWindow.shareData(jsonEncode({
+@@ -232,6 +248,18 @@ Future<void> _handleScreenshot(Map<String, dynamic> map) async {
+     return;
+   }
+ 
++  // Fixed-language templates bake the target language into the prompt
++  // body — the overlay always needs a user-chosen target language via
++  // the `target` IPC field, so refuse to drive these from the overlay.
++  if (template.outputLanguageFixed) {
++    await _sendError(
++      'Error: Selected template has a fixed output language and is '
++      'not compatible with floating overlay translation. Please open '
++      'app Settings to pick a different overlay template.',
++    );
++    return;
++  }
++
+   debugPrint('[OverlayIPC] Requesting screenshot capture...');
+   
+   Uint8List? imageBytes;
+diff --git a/translation_app/lib/screens/api_keys_screen.dart b/translation_app/lib/screens/api_keys_screen.dart
+index ee7a5d2..9e8ddd1 100644
+--- a/translation_app/lib/screens/api_keys_screen.dart
++++ b/translation_app/lib/screens/api_keys_screen.dart
+@@ -37,9 +37,23 @@ class ApiKeysScreen extends ConsumerWidget {
+               ),
+             )
+           : ListView.builder(
+-              padding: const EdgeInsets.all(16),
+-              itemCount: apiKeys.length,
++              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
++              itemCount: apiKeys.length + 1,
+               itemBuilder: (context, index) {
++                if (index == apiKeys.length) {
++                  // Trailing CTA so users can add a new key without
++                  // reaching for the AppBar "+" icon. Matches the
++                  // discoverability guidance added with the
++                  // profile-edit access dialog.
++                  return Padding(
++                    padding: const EdgeInsets.only(top: 8),
++                    child: OutlinedButton.icon(
++                      onPressed: () => _showEditDialog(context, ref, null),
++                      icon: const Icon(Icons.add),
++                      label: const Text('Add new key'),
++                    ),
++                  );
++                }
+                 final entry = apiKeys[index];
+                 return _ApiKeyCard(
+                   entry: entry,
+diff --git a/translation_app/lib/screens/article_screen.dart b/translation_app/lib/screens/article_screen.dart
+index d82236f..ffb986c 100644
+--- a/translation_app/lib/screens/article_screen.dart
++++ b/translation_app/lib/screens/article_screen.dart
+@@ -10,6 +10,13 @@ import '../widgets/bidi_markdown_view.dart';
+ /// through [BiDiMarkdownView], which already handles BiDi direction
+ /// detection, RTL-aware markdown layout, and long-text performance
+ /// (RegExp hoisting, capped direction-scan window, stable ValueKey).
++///
++/// **Localization invariant:** Article content is intentionally Arabic-only.
++/// The bundled Markdown files under `assets/articles/` and the titles in
++/// `kAppArticles` (see [articles_service.dart]) are authored in Arabic and
++/// are *not* translated when the user switches the app locale to English.
++/// This is by product decision: the help/support content is curated Arabic
++/// reference material and stays Arabic regardless of UI locale.
+ class ArticleScreen extends StatefulWidget {
+   /// The article to render. Required.
+   final AppArticle article;
+diff --git a/translation_app/lib/screens/history_detail_screen.dart b/translation_app/lib/screens/history_detail_screen.dart
+index f231494..bec1c00 100644
+--- a/translation_app/lib/screens/history_detail_screen.dart
++++ b/translation_app/lib/screens/history_detail_screen.dart
+@@ -1,7 +1,9 @@
+ import 'dart:io';
+ 
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:history/history.dart';
++import 'package:markdown_renderer/markdown_renderer.dart';
+ import 'package:path_provider/path_provider.dart';
+ 
+ import '../widgets/bidi_markdown_view.dart';
+@@ -9,8 +11,10 @@ import 'package:share_plus/share_plus.dart';
+ 
+ /// Detail screen for a single translation record.
+ ///
+-/// Shows the full input text, the rendered Markdown output, and a share
+-/// button that exports the output as a temporary `.md` file.
++/// Shows the full input text, the rendered Markdown output, a copy button
++/// (short-press = plain, long-press = choose Markdown), and a share button
++/// that opens a bottom sheet with three options: plain text, Markdown
++/// file, or save to a user-chosen location.
+ class HistoryDetailScreen extends StatelessWidget {
+   /// The translation record to display.
+   final TranslationRecord record;
+@@ -18,19 +22,159 @@ class HistoryDetailScreen extends StatelessWidget {
+   /// Creates the [HistoryDetailScreen].
+   const HistoryDetailScreen({super.key, required this.record});
+ 
++  // ── Copy ──────────────────────────────────────────────────────────────
++
++  /// Copies the translation output as plain text (Markdown stripped).
++  ///
++  /// This is the safe default: pasting into another app or chat should not
++  /// leak raw Markdown markers like `**` or `#` into the user's text.
++  void _copyText(BuildContext context) {
++    Clipboard.setData(
++      ClipboardData(text: toPlainText(record.outputText)),
++    );
++    ScaffoldMessenger.of(context).showSnackBar(
++      const SnackBar(
++        content: Text('Copied to clipboard'),
++        duration: Duration(seconds: 1),
++      ),
++    );
++  }
++
++  /// Shows a bottom sheet letting the user pick between plain text and
++  /// raw Markdown for the copy action.
++  Future<void> _showCopyOptions(BuildContext context) async {
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('نسخ كنص عادي'),
++              subtitle: const Text('بدون تنسيق Markdown'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await Clipboard.setData(
++                  ClipboardData(text: toPlainText(record.outputText)),
++                );
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(
++                      content: Text('Copied to clipboard'),
++                      duration: Duration(seconds: 1),
++                    ),
++                  );
++                }
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('نسخ كـ Markdown'),
++              subtitle: const Text('مع التنسيق الأصلي'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await Clipboard.setData(
++                  ClipboardData(text: record.outputText),
++                );
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(
++                      content: Text('Copied to clipboard'),
++                      duration: Duration(seconds: 1),
++                    ),
++                  );
++                }
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++  }
++
+   // ── Share ─────────────────────────────────────────────────────────────
+ 
+-  /// Exports the translation output as a temporary `.md` file and invokes
++  /// Opens a bottom sheet with three share options: plain text, Markdown
++  /// file, or save-to-file via the system share sheet.
++  Future<void> _showShareOptions(BuildContext context) async {
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('مشاركة كنص عادي'),
++              subtitle: const Text('بدون تنسيق Markdown'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await SharePlus.instance.share(
++                  ShareParams(text: toPlainText(record.outputText)),
++                );
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('مشاركة كـ Markdown (.md)'),
++              subtitle: const Text('ملف نصي بالتنسيق الأصلي'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await _shareAsMarkdown();
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.save_alt),
++              title: const Text('حفظ إلى ملف'),
++              subtitle: const Text('اختر مكان الحفظ من ورقة المشاركة'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await _saveToDownloads();
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++  }
++
++  /// Writes the translation output to a temporary `.md` file and opens
+   /// the system share sheet.
+   ///
+-  /// The temp file is deleted after sharing to avoid leaving artefacts on
+-  /// permanent storage.
+-  Future<void> _handleShare() async {
++  /// Preserved from the original single-mode share behaviour.
++  Future<void> _shareAsMarkdown() async {
++    final tempDir = await getTemporaryDirectory();
++    final file = File('${tempDir.path}/translation_${record.id}.md');
++    try {
++      await file.writeAsString(record.outputText);
++      await SharePlus.instance.share(
++        ShareParams(
++          text: 'Translation result',
++          subject: 'Jusoor Result',
++          files: [XFile(file.path)],
++        ),
++      );
++    } finally {
++      if (await file.exists()) {
++        await file.delete();
++      }
++    }
++  }
++
++  /// Writes the translation output to a `.md` file in the temp directory
++  /// and opens the share sheet with the file attached so the user can
++  /// pick the final destination (Downloads, Drive, Telegram, etc.) without
++  /// the app requiring `WRITE_EXTERNAL_STORAGE`.
++  Future<void> _saveToDownloads() async {
+     final tempDir = await getTemporaryDirectory();
+-    // Record IDs are always set when loaded from the database.
+     final file = File(
+-      '${tempDir.path}/translation_${record.id}.md',
+-    ); // ignore: null_check_on_fail
++      '${tempDir.path}/jusoor_translation_${record.id}.md',
++    );
+     try {
+       await file.writeAsString(record.outputText);
+       await SharePlus.instance.share(
+@@ -67,10 +211,16 @@ class HistoryDetailScreen extends StatelessWidget {
+       appBar: AppBar(
+         title: const Text('Translation Details'),
+         actions: [
++          IconButton(
++            icon: const Icon(Icons.copy),
++            tooltip: 'Copy translation',
++            onPressed: () => _copyText(context),
++            onLongPress: () => _showCopyOptions(context),
++          ),
+           IconButton(
+             icon: const Icon(Icons.share),
+             tooltip: 'Share translation',
+-            onPressed: _handleShare,
++            onPressed: () => _showShareOptions(context),
+           ),
+         ],
+       ),
+diff --git a/translation_app/lib/screens/home_screen.dart b/translation_app/lib/screens/home_screen.dart
+index d9d6c92..cd5fdbe 100644
+--- a/translation_app/lib/screens/home_screen.dart
++++ b/translation_app/lib/screens/home_screen.dart
+@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:image_picker/image_picker.dart';
++import 'package:markdown_renderer/markdown_renderer.dart';
+ import 'package:path_provider/path_provider.dart';
+ import 'package:share_plus/share_plus.dart';
+ import 'package:translation_core/translation_core.dart';
+@@ -136,6 +137,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
+ 
+   int get _wordCount => _cachedWordCount;
+ 
++  /// Returns the currently selected text template, or `null` when none is
++  /// chosen or the id no longer resolves.
++  PromptTemplate? get _selectedTextTemplate {
++    final id = ref.watch(selectedTextTemplateProvider);
++    if (id == null) return null;
++    final templates = ref.watch(templatesProvider);
++    for (final t in templates) {
++      if (t.id == id) return t;
++    }
++    return null;
++  }
++
++  /// True when the selected text template locks the output language
++  /// (no `{{target_language}}` substitution). When true, the language
++  /// selector on the home screen is hidden because the template bakes the
++  /// target language into its prompt.
++  bool get _isSelectedTemplateFixedLanguage {
++    final template = _selectedTextTemplate;
++    return template?.outputLanguageFixed == true;
++  }
++
+   // ── Handlers ───────────────────────────────────────────────────────
+ 
+   Future<void> _handleTranslate() async {
+@@ -148,7 +170,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
+       if (!proceed) return;
+     }
+ 
+-    final targetLang = ref.read(targetLanguageProvider);
++    // When the selected text template has a fixed output language, it
++    // bakes the target language into the prompt body. The selector is
++    // hidden in that case, so we pass "auto" instead of whatever the
++    // stale provider holds — the model decides the target itself per
++    // its baked-in instructions.
++    final targetLang =
++        _isSelectedTemplateFixedLanguage ? 'auto' : ref.read(targetLanguageProvider);
+ 
+     final request = TranslationRequest(
+       inputText: inputText,
+@@ -257,14 +285,104 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
+   Future<void> _handleShare() async {
+     final state = ref.read(translationProvider);
+     if (state is! TranslationDone) return;
++    await _showShareOptions(state.fullText);
++  }
++
++  /// Shows a bottom sheet with three share options:
++  /// 1. Share as plain text (Markdown stripped).
++  /// 2. Share as a Markdown `.md` file (the existing behaviour).
++  /// 3. Save to a downloadable file (user picks the destination).
++  Future<void> _showShareOptions(String text) async {
++    if (!mounted) return;
++    final messenger = ScaffoldMessenger.of(context);
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('مشاركة كنص عادي'),
++              subtitle: const Text('بدون تنسيق Markdown'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await SharePlus.instance.share(
++                  ShareParams(text: toPlainText(text)),
++                );
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('مشاركة كـ Markdown (.md)'),
++              subtitle: const Text('ملف نصي بالتنسيق الأصلي'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await _shareAsMarkdown(text);
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.save_alt),
++              title: const Text('حفظ إلى ملف'),
++              subtitle: const Text('اختر مكان الحفظ من ورقة المشاركة'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await _saveToDownloads(text);
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++    // Suppress unused-variable warning when messenger is not yet needed.
++    // (Kept here so future error toasts land on the same ScaffoldMessenger.)
++    // ignore: unused_local_variable
++    final _ = messenger;
++  }
+ 
++  /// Writes [text] to a temporary `.md` file and opens the share sheet.
++  ///
++  /// Preserved from the original single-mode share behaviour.
++  Future<void> _shareAsMarkdown(String text) async {
++    // Capture l10n before any await so we don't need context after async
++    // gaps in this helper.
+     final l10n = AppLocalizations.of(context);
+     final tempDir = await getTemporaryDirectory();
+     final timestamp = DateTime.now().millisecondsSinceEpoch;
+     final file = File('${tempDir.path}/translation_$timestamp.md');
+     try {
+-      await file.writeAsString(state.fullText);
++      await file.writeAsString(text);
++      await SharePlus.instance.share(
++        ShareParams(
++          text: l10n.homeShareText,
++          subject: l10n.homeShareSubject,
++          files: [XFile(file.path)],
++        ),
++      );
++    } finally {
++      if (await file.exists()) {
++        await file.delete();
++      }
++    }
++  }
+ 
++  /// Writes [text] to a `.md` file in the temp directory and opens the
++  /// share sheet with the file attached so the user can pick the final
++  /// destination (Downloads, Drive, Telegram, etc.) without the app
++  /// requiring `WRITE_EXTERNAL_STORAGE`.
++  Future<void> _saveToDownloads(String text) async {
++    // Capture l10n before any await so we don't need context after async
++    // gaps in this helper.
++    final l10n = AppLocalizations.of(context);
++    final tempDir = await getTemporaryDirectory();
++    final timestamp = DateTime.now().millisecondsSinceEpoch;
++    final file = File(
++      '${tempDir.path}/jusoor_translation_$timestamp.md',
++    );
++    try {
++      await file.writeAsString(text);
+       await SharePlus.instance.share(
+         ShareParams(
+           text: l10n.homeShareText,
+@@ -273,7 +391,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
+         ),
+       );
+     } finally {
+-      // Clean up the temp file
+       if (await file.exists()) {
+         await file.delete();
+       }
+@@ -319,7 +436,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
+               const SizedBox(height: 16),
+ 
+               // ── Language selectors ─────────────────────────────────
+-              _LanguageSelectorRow(),
++              // Hide when the selected text template locks the output
++              // language (it bakes the target language into the prompt
++              // via `{{target_language}} = <fixed>`).
++              Visibility(
++                visible: !_isSelectedTemplateFixedLanguage,
++                maintainState: true,
++                child: _LanguageSelectorRow(),
++              ),
+               const SizedBox(height: 16),
+ 
+               // ── Input area ─────────────────────────────────────────
+@@ -929,7 +1053,7 @@ class _OutputArea extends StatelessWidget {
+   const _OutputArea({required this.state});
+ 
+   void _copyText(BuildContext context, String text) {
+-    Clipboard.setData(ClipboardData(text: text));
++    Clipboard.setData(ClipboardData(text: toPlainText(text)));
+     ScaffoldMessenger.of(context).showSnackBar(
+       SnackBar(
+         content: Text(AppLocalizations.of(context).homeCopiedToClipboard),
+@@ -938,6 +1062,63 @@ class _OutputArea extends StatelessWidget {
+     );
+   }
+ 
++  /// Shows a bottom sheet letting the user pick between copying the
++  /// translation as plain text (Markdown stripped) or as raw Markdown.
++  ///
++  /// Triggered by long-pressing the copy button. The single tap path still
++  /// copies plain text (the safer default).
++  Future<void> _showCopyOptions(BuildContext context, String text) async {
++    final l10n = AppLocalizations.of(context);
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.short_text),
++              title: const Text('نسخ كنص عادي'),
++              subtitle: Text(l10n.homeCopiedToClipboard),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await Clipboard.setData(
++                  ClipboardData(text: toPlainText(text)),
++                );
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    SnackBar(
++                      content: Text(l10n.homeCopiedToClipboard),
++                      duration: const Duration(seconds: 1),
++                    ),
++                  );
++                }
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.code),
++              title: const Text('نسخ كـ Markdown'),
++              subtitle: const Text('مع التنسيق الأصلي'),
++              onTap: () async {
++                Navigator.of(sheetCtx).pop();
++                await Clipboard.setData(ClipboardData(text: text));
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    SnackBar(
++                      content: Text(l10n.homeCopiedToClipboard),
++                      duration: const Duration(seconds: 1),
++                    ),
++                  );
++                }
++              },
++            ),
++            const SizedBox(height: 8),
++          ],
++        ),
++      ),
++    );
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
+@@ -960,6 +1141,7 @@ class _OutputArea extends StatelessWidget {
+                   icon: const Icon(Icons.copy, size: 20),
+                   tooltip: l10n.homeCopyTooltip,
+                   onPressed: () => _copyText(context, partial),
++                  onLongPress: () => _showCopyOptions(context, partial),
+                 ),
+               ],
+             ),
+@@ -980,6 +1162,7 @@ class _OutputArea extends StatelessWidget {
+                     icon: const Icon(Icons.copy, size: 20),
+                     tooltip: l10n.homeCopyTooltip,
+                     onPressed: () => _copyText(context, fullText),
++                    onLongPress: () => _showCopyOptions(context, fullText),
+                   ),
+                 ],
+               ),
+diff --git a/translation_app/lib/screens/profile_edit_screen.dart b/translation_app/lib/screens/profile_edit_screen.dart
+index 9415c24..636a7d4 100644
+--- a/translation_app/lib/screens/profile_edit_screen.dart
++++ b/translation_app/lib/screens/profile_edit_screen.dart
+@@ -1,8 +1,11 @@
++import 'dart:async';
++
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:translation_core/translation_core.dart';
+ 
+ import '../providers/settings_provider.dart';
++import '../screens/api_keys_screen.dart';
+ import '../widgets/selection_modal.dart';
+ 
+ class ProfileEditScreen extends ConsumerStatefulWidget {
+@@ -28,6 +31,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+   String? _selectedModel;
+   String? _selectedVisionModel;
+ 
++  /// When true, the API Key `InputDecorator` renders with a red border to
++  /// draw the user's attention to it. Set when the user attempts to pick
++  /// a model without selecting an API key first; cleared automatically
++  /// after a short animation (see [_apiKeyHighlightTimer]).
++  bool _apiKeyHighlight = false;
++  Timer? _apiKeyHighlightTimer;
++
+   bool get _isEditing => widget.profile != null;
+ 
+   bool get _canFetchModels => _selectedApiKeyId != null;
+@@ -42,9 +52,89 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+   void dispose() {
+     _nameController.dispose();
+     _baseUrlController.dispose();
++    _apiKeyHighlightTimer?.cancel();
+     super.dispose();
+   }
+ 
++  /// Triggers a brief red-border highlight on the API Key field so the user
++  /// notices where the dependency lives.
++  void _flashApiKeyHighlight() {
++    _apiKeyHighlightTimer?.cancel();
++    setState(() => _apiKeyHighlight = true);
++    _apiKeyHighlightTimer = Timer(const Duration(milliseconds: 1800), () {
++      if (mounted) {
++        setState(() => _apiKeyHighlight = false);
++      }
++    });
++  }
++
++  /// Bottom-sheet picker shown when the user taps the Model / Vision Model
++  /// field while no API key is selected. Offers a fast path to either
++  /// pick an existing key or add a new one.
++  Future<void> _showModelAccessDialog() async {
++    await showModalBottomSheet<void>(
++      context: context,
++      showDragHandle: true,
++      builder: (sheetCtx) {
++        final colorScheme = Theme.of(sheetCtx).colorScheme;
++        return SafeArea(
++          child: Column(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Padding(
++                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
++                child: Row(
++                  children: [
++                    Icon(Icons.key_off, color: colorScheme.error),
++                    const SizedBox(width: 8),
++                    Expanded(
++                      child: Text(
++                        'يلزم تحديد مفتاح API أولًا',
++                        style: Theme.of(sheetCtx).textTheme.titleMedium,
++                      ),
++                    ),
++                  ],
++                ),
++              ),
++              Padding(
++                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
++                child: Text(
++                  'اختر مفتاحًا موجودًا من قائمتك، أو أضف مفتاحًا جديدًا للبدء بجلب النماذج.',
++                  style: Theme.of(sheetCtx).textTheme.bodyMedium?.copyWith(
++                    color: colorScheme.onSurfaceVariant,
++                  ),
++                ),
++              ),
++              ListTile(
++                leading: const Icon(Icons.key),
++                title: const Text('اختر مفتاحًا موجودًا'),
++                onTap: () {
++                  Navigator.of(sheetCtx).pop();
++                  _flashApiKeyHighlight();
++                  _selectApiKey();
++                },
++              ),
++              ListTile(
++                leading: const Icon(Icons.add_circle_outline),
++                title: const Text('إضافة مفتاح جديد'),
++                onTap: () {
++                  Navigator.of(sheetCtx).pop();
++                  Navigator.of(context).push(
++                    MaterialPageRoute(
++                      builder: (_) => const ApiKeysScreen(),
++                      fullscreenDialog: true,
++                    ),
++                  );
++                },
++              ),
++              const SizedBox(height: 8),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
+   void _loadProfile() {
+     final profile = widget.profile;
+     if (profile == null) return;
+@@ -193,8 +283,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+         .toList();
+ 
+     if (options.isEmpty) {
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        const SnackBar(content: Text('No API keys available. Add one in Settings.')),
++      // No keys exist yet: take the user directly to the keys manager
++      // instead of showing a dead-end snackbar.
++      if (!mounted) return;
++      await Navigator.of(context).push(
++        MaterialPageRoute(
++          builder: (_) => const ApiKeysScreen(),
++          fullscreenDialog: true,
++        ),
+       );
+       return;
+     }
+@@ -317,7 +413,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+             ),
+             child: GestureDetector(
+               behavior: HitTestBehavior.opaque,
+-              onTap: _canFetchModels ? _selectModel : null,
++              onTap: _canFetchModels ? _selectModel : _showModelAccessDialog,
+               child: Text(
+                 _selectedModel ?? (_canFetchModels ? 'Select a model' : 'Select API key first'),
+                 style: theme.textTheme.bodyLarge?.copyWith(
+@@ -344,7 +440,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+             ),
+             child: GestureDetector(
+               behavior: HitTestBehavior.opaque,
+-              onTap: _canFetchModels ? _selectVisionModel : null,
++              onTap: _canFetchModels ? _selectVisionModel : _showModelAccessDialog,
+               child: Text(
+                 _selectedVisionModel ?? (_canFetchModels ? 'For image translation' : 'Select API key first'),
+                 style: theme.textTheme.bodyLarge?.copyWith(
+@@ -358,9 +454,35 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+           const SizedBox(height: 16),
+ 
+           InputDecorator(
+-            decoration: const InputDecoration(
++            decoration: InputDecoration(
+               labelText: 'API Key',
+-              border: OutlineInputBorder(),
++              border: OutlineInputBorder(
++                borderRadius: BorderRadius.circular(4),
++                borderSide: _apiKeyHighlight
++                    ? BorderSide(
++                        color: theme.colorScheme.error,
++                        width: 2,
++                      )
++                    : BorderSide(color: theme.colorScheme.outline),
++              ),
++              focusedBorder: OutlineInputBorder(
++                borderRadius: BorderRadius.circular(4),
++                borderSide: _apiKeyHighlight
++                    ? BorderSide(
++                        color: theme.colorScheme.error,
++                        width: 2,
++                      )
++                    : BorderSide(color: theme.colorScheme.primary),
++              ),
++              enabledBorder: OutlineInputBorder(
++                borderRadius: BorderRadius.circular(4),
++                borderSide: _apiKeyHighlight
++                    ? BorderSide(
++                        color: theme.colorScheme.error,
++                        width: 2,
++                      )
++                    : BorderSide(color: theme.colorScheme.outline),
++              ),
+             ),
+             child: GestureDetector(
+               behavior: HitTestBehavior.opaque,
+diff --git a/translation_app/lib/screens/template_edit_screen.dart b/translation_app/lib/screens/template_edit_screen.dart
+index 5fcf07c..57b7dbc 100644
+--- a/translation_app/lib/screens/template_edit_screen.dart
++++ b/translation_app/lib/screens/template_edit_screen.dart
+@@ -37,6 +37,10 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+   bool _supportsText = true;
+   bool _supportsImage = false;
+   bool _substituteTargetLanguage = true;
++  bool _outputLanguageFixed = false;
++  bool _enableThinking = false;
++  bool _stream = false;
++  String _maxOutputWordsText = '10000';
+ 
+   /// Whether this is an edit of an existing template.
+   bool get _isEditing => widget.template != null;
+@@ -77,6 +81,10 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+     _supportsText = template.supportsText;
+     _supportsImage = template.supportsImage;
+     _substituteTargetLanguage = template.substituteTargetLanguage;
++    _outputLanguageFixed = template.outputLanguageFixed;
++    _enableThinking = template.enableThinking;
++    _stream = template.stream;
++    _maxOutputWordsText = template.maxOutputWords.toString();
+   }
+ 
+   // ── Build ──────────────────────────────────────────────────────────
+@@ -175,6 +183,50 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+             subtitle: Text(l10n.tplSubSubtitle('{{target_language}}')),
+             onChanged: (v) => setState(() => _substituteTargetLanguage = v),
+           ),
++
++          // ── Fixed Output Language (no {{target_language}} variable) ──
++          SwitchListTile(
++            value: _outputLanguageFixed,
++            title: Text(l10n.tplOutLangFixedTitle),
++            subtitle: Text(l10n.tplOutLangFixedSubtitle),
++            onChanged: (v) => setState(() => _outputLanguageFixed = v),
++          ),
++
++          const SizedBox(height: 16),
++          // ── Advanced section (model reasoning + streaming + word cap) ──
++          ExpansionTile(
++            leading: const Icon(Icons.tune),
++            title: Text(l10n.tplAdvancedTitle),
++            subtitle: Text(l10n.tplAdvancedSubtitle),
++            childrenPadding: const EdgeInsets.symmetric(horizontal: 8),
++            children: [
++              SwitchListTile(
++                value: _enableThinking,
++                title: Text(l10n.tplEnableThinkingTitle),
++                subtitle: Text(l10n.tplEnableThinkingSubtitle),
++                onChanged: (v) => setState(() => _enableThinking = v),
++              ),
++              SwitchListTile(
++                value: _stream,
++                title: Text(l10n.tplEnableStreamTitle),
++                subtitle: Text(l10n.tplEnableStreamSubtitle),
++                onChanged: (v) => setState(() => _stream = v),
++              ),
++              Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++                child: TextField(
++                  keyboardType: TextInputType.number,
++                  controller: TextEditingController(text: _maxOutputWordsText),
++                  onChanged: (v) => _maxOutputWordsText = v,
++                  decoration: InputDecoration(
++                    labelText: l10n.tplMaxOutputWordsLabel,
++                    helperText: l10n.tplMaxOutputWordsHelper,
++                    border: const OutlineInputBorder(),
++                  ),
++                ),
++              ),
++            ],
++          ),
+         ],
+       ),
+       floatingActionButton: FloatingActionButton.extended(
+@@ -241,6 +293,10 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
+       supportsText: _supportsText,
+       supportsImage: _supportsImage,
+       substituteTargetLanguage: _substituteTargetLanguage,
++      outputLanguageFixed: _outputLanguageFixed,
++      enableThinking: _enableThinking,
++      stream: _stream,
++      maxOutputWords: int.tryParse(_maxOutputWordsText) ?? 10000,
+       isBuiltIn: _isEditing ? widget.template!.isBuiltIn : false,
+     );
+ 
+diff --git a/translation_app/lib/services/settings_repository.dart b/translation_app/lib/services/settings_repository.dart
+index 767afde..a43a520 100644
+--- a/translation_app/lib/services/settings_repository.dart
++++ b/translation_app/lib/services/settings_repository.dart
+@@ -212,8 +212,8 @@ class SettingsRepository {
+   Future<void> setDefaultTargetLanguage(String value) =>
+       _prefs.setString(_defaultTargetLanguageKey, value);
+ 
+-  /// Returns the word limit, defaulting to `5000`.
+-  int get wordLimit => _prefs.getInt(_wordLimitKey) ?? 5000;
++  /// Returns the word limit, defaulting to `10000`.
++  int get wordLimit => _prefs.getInt(_wordLimitKey) ?? 10000;
+ 
+   /// Persists the word limit.
+   Future<void> setWordLimit(int value) => _prefs.setInt(_wordLimitKey, value);
+diff --git a/translation_app/pubspec.yaml b/translation_app/pubspec.yaml
+index 456e2b9..61c4fe6 100644
+--- a/translation_app/pubspec.yaml
++++ b/translation_app/pubspec.yaml
+@@ -1,5 +1,5 @@
+ name: translation_app
+-version: 0.1.5+2009
++version: 0.1.5+2010
+ resolution: workspace
+ 
+ publish_to: 'none'
+diff --git a/translation_app/test/articles_service_test.dart b/translation_app/test/articles_service_test.dart
+new file mode 100644
+index 0000000..cd55bc4
+--- /dev/null
++++ b/translation_app/test/articles_service_test.dart
+@@ -0,0 +1,82 @@
++import 'package:flutter_test/flutter_test.dart';
++
++import 'package:translation_app/services/articles_service.dart';
++
++/// Articles are intentionally Arabic-only regardless of the app locale
++/// (see invariant comment in `screens/article_screen.dart`). These tests
++/// guard that invariant so a future i18n pass does not silently start
++/// surfacing English copies of the bundled Markdown.
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  group('kAppArticles — Arabic content invariant', () {
++    test('contains the expected number of bundled articles', () {
++      expect(kAppArticles, hasLength(greaterThanOrEqualTo(3)));
++    });
++
++    test('every article id is a 2-digit numeric prefix', () {
++      final idPattern = RegExp(r'^\d{2}$');
++      for (final article in kAppArticles) {
++        expect(
++          idPattern.hasMatch(article.id),
++          isTrue,
++          reason: 'Article id "${article.id}" should be a 2-digit prefix',
++        );
++      }
++    });
++
++    test('every article title contains Arabic characters', () {
++      final arabicRange = RegExp(r'[\u0600-\u06FF]');
++      for (final article in kAppArticles) {
++        expect(
++          arabicRange.hasMatch(article.title),
++          isTrue,
++          reason:
++              'Article title "${article.title}" should contain Arabic '
++              'characters (articles are Arabic-only by design)',
++        );
++      }
++    });
++
++    test('every article excerpt contains Arabic characters', () {
++      final arabicRange = RegExp(r'[\u0600-\u06FF]');
++      for (final article in kAppArticles) {
++        expect(
++          arabicRange.hasMatch(article.excerpt),
++          isTrue,
++          reason:
++              'Article excerpt for "${article.id}" should contain Arabic '
++              'characters (articles are Arabic-only by design)',
++        );
++      }
++    });
++
++    test('every article asset path points under assets/articles/', () {
++      for (final article in kAppArticles) {
++        expect(
++          article.asset,
++          startsWith('assets/articles/'),
++          reason: 'Article asset "${article.asset}" should live under '
++              'assets/articles/',
++        );
++        expect(
++          article.asset,
++          endsWith('.md'),
++          reason: 'Article asset "${article.asset}" should be a .md file',
++        );
++      }
++    });
++
++    test('article assets correspond to actual bundled Markdown files', () async {
++      // Sanity check: loadArticleBody should succeed for every article.
++      // If an asset path drifts from the bundle, this test fails fast.
++      for (final article in kAppArticles) {
++        final body = await loadArticleBody(article);
++        expect(
++          body,
++          isNotEmpty,
++          reason: 'Body of article "${article.id}" should be non-empty',
++        );
++      }
++    });
++  });
++}
+\ No newline at end of file

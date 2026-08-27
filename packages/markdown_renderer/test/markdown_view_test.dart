@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markdown_renderer/markdown_renderer.dart';
@@ -205,6 +206,97 @@ void main() {
       final richTexts = tester.widgetList<RichText>(find.byType(RichText));
       final allText = richTexts.map((rt) => rt.text.toPlainText()).join(' ');
       expect(allText, contains('code'));
+    });
+
+    group('link confirmation', () {
+      // url_launcher's MethodChannelUrlLauncher uses
+      // MethodChannel('plugins.flutter.io/url_launcher') with method
+      // names 'canLaunch' and 'launch' (see
+      // url_launcher_platform_interface/method_channel_url_launcher.dart).
+      // We mock that channel directly rather than SystemChannels.platform,
+      // which the plugin does not use.
+      late List<MethodCall> platformCalls;
+
+      setUp(() {
+        platformCalls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/url_launcher'),
+              (MethodCall call) async {
+                platformCalls.add(call);
+                if (call.method == 'launch') return true;
+                if (call.method == 'canLaunch') return true;
+                return null;
+              },
+            );
+      });
+
+      tearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/url_launcher'),
+              null,
+            );
+      });
+
+      testWidgets('Cancel on confirmation dialog blocks launchUrl', (
+        WidgetTester tester,
+      ) async {
+        await tester.pumpWidget(
+          buildSubject(
+            const MarkdownView(markdownText: '[Click me](https://example.com)'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap the link — this should pop the confirmation dialog.
+        await tester.tap(find.text('Click me'));
+        await tester.pumpAndSettle();
+
+        // Dialog visible with the expected title and host.
+        expect(find.text('Open external link?'), findsOneWidget);
+        expect(find.text('example.com'), findsOneWidget);
+
+        // Tap Cancel.
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        // No 'launch' call was made on the url_launcher channel.
+        final launchCalls = platformCalls
+            .where((c) => c.method == 'launch')
+            .toList();
+        expect(launchCalls, isEmpty);
+      });
+
+      testWidgets('Open on confirmation dialog calls launchUrl exactly once', (
+        WidgetTester tester,
+      ) async {
+        await tester.pumpWidget(
+          buildSubject(
+            const MarkdownView(
+              markdownText: '[Visit](https://example.org/path)',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Visit'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Open external link?'), findsOneWidget);
+        expect(find.text('example.org'), findsOneWidget);
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        final launchCalls = platformCalls
+            .where((c) => c.method == 'launch')
+            .toList();
+        expect(launchCalls, hasLength(1));
+        // The url_launcher method call exposes the URI under the
+        // 'url' argument key.
+        expect(launchCalls.first.arguments['url'], 'https://example.org/path');
+      });
     });
   });
 }

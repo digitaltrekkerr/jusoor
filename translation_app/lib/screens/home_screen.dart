@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:markdown_renderer/markdown_renderer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:translation_core/translation_core.dart';
@@ -15,6 +16,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
 import '../providers/share_intent_provider.dart';
 import '../providers/translation_provider.dart';
+import '../services/deferred_temp_file_cleanup.dart';
 import '../services/share_intent_handler.dart';
 import '../widgets/bidi_markdown_view.dart';
 import '../widgets/language_dropdown.dart';
@@ -97,7 +99,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       textToInsert = content.text;
     } else if (content.hasFile) {
       final handler = ref.read(shareIntentHandlerProvider);
-      final parsed = await handler.parseSharedFile(content);
+      SharedContent parsed;
+      try {
+        parsed = await handler.parseSharedFile(content);
+      } on SharedFileTooLargeException {
+        // OOM guard: refuse files over the 50 MB ceiling with a clear
+        // message instead of crashing while reading them into memory.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).shareFileTooLarge,
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        ref.read(sharedContentProvider.notifier).clear();
+        return;
+      }
       if (parsed.hasImage) {
         setState(() {
           _imageBytes = parsed.imageBytes;
@@ -136,6 +156,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   int get _wordCount => _cachedWordCount;
 
+  /// Returns the currently selected text template, or `null` when none is
+  /// chosen or the id no longer resolves.
+  PromptTemplate? get _selectedTextTemplate {
+    final id = ref.watch(selectedTextTemplateProvider);
+    if (id == null) return null;
+    final templates = ref.watch(templatesProvider);
+    for (final t in templates) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  /// True when the selected text template locks the output language
+  /// (no `{{target_language}}` substitution). When true, the language
+  /// selector on the home screen is hidden because the template bakes the
+  /// target language into its prompt.
+  bool get _isSelectedTemplateFixedLanguage {
+    final template = _selectedTextTemplate;
+    return template?.outputLanguageFixed == true;
+  }
+
   // ── Handlers ───────────────────────────────────────────────────────
 
   Future<void> _handleTranslate() async {
@@ -148,6 +189,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!proceed) return;
     }
 
+    // A fixed-language template hides the language selector only to prevent
+    // mid-typing changes — its prompt still resolves `{{target_language}}`
+    // from the user's persisted default target language. Passing the 'auto'
+    // sentinel here made the prompt read "translate to auto" and the model
+    // echoed the source text unchanged, so always send the persisted value.
     final targetLang = ref.read(targetLanguageProvider);
 
     final request = TranslationRequest(
@@ -257,14 +303,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _handleShare() async {
     final state = ref.read(translationProvider);
     if (state is! TranslationDone) return;
+    await _showShareOptions(state.fullText);
+  }
 
+  /// Shows a bottom sheet with three share options:
+  /// 1. Share as plain text (Markdown stripped).
+  /// 2. Share as a Markdown `.md` file (the existing behaviour).
+  /// 3. Save to a downloadable file (user picks the destination).
+  Future<void> _showShareOptions(String text) async {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                l10n.shareOptionsTitle,
+                style: Theme.of(sheetCtx).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.short_text),
+              title: Text(l10n.shareAsPlain),
+              subtitle: Text(l10n.sheetPlainSubtitle),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await SharePlus.instance.share(
+                  ShareParams(text: toPlainText(text)),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: Text(l10n.shareAsMarkdown),
+              subtitle: Text(l10n.sheetMarkdownFileSubtitle),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await _shareAsMarkdown(text);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_alt),
+              title: Text(l10n.saveToFile),
+              subtitle: Text(l10n.sheetSaveToFileSubtitle),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await _saveToDownloads(text);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Writes [text] to a temporary `.md` file and opens the share sheet.
+  ///
+  /// Preserved from the original single-mode share behaviour.
+  Future<void> _shareAsMarkdown(String text) async {
+    // Capture l10n before any await so we don't need context after async
+    // gaps in this helper.
     final l10n = AppLocalizations.of(context);
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final file = File('${tempDir.path}/translation_$timestamp.md');
     try {
-      await file.writeAsString(state.fullText);
-
+      await file.writeAsString(text);
       await SharePlus.instance.share(
         ShareParams(
           text: l10n.homeShareText,
@@ -273,10 +383,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       );
     } finally {
-      // Clean up the temp file
-      if (await file.exists()) {
-        await file.delete();
-      }
+      // Never delete here: the share target may still be reading the file
+      // after the sheet closes. Deletion is deferred by a grace period so
+      // the receiving app always grabs a live file.
+      DeferredTempFileCleanup.instance.scheduleDeletion(file.path);
+    }
+  }
+
+  /// Writes [text] to a `.md` file in the temp directory and opens the
+  /// share sheet with the file attached so the user can pick the final
+  /// destination (Downloads, Drive, Telegram, etc.) without the app
+  /// requiring `WRITE_EXTERNAL_STORAGE`.
+  Future<void> _saveToDownloads(String text) async {
+    // Capture l10n before any await so we don't need context after async
+    // gaps in this helper.
+    final l10n = AppLocalizations.of(context);
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File(
+      '${tempDir.path}/jusoor_translation_$timestamp.md',
+    );
+    try {
+      await file.writeAsString(text);
+      await SharePlus.instance.share(
+        ShareParams(
+          text: l10n.homeShareText,
+          subject: l10n.homeShareSubject,
+          files: [XFile(file.path)],
+        ),
+      );
+    } finally {
+      // Deferred cleanup: keeps the file alive while the share target reads
+      // it, then removes it after a grace period.
+      DeferredTempFileCleanup.instance.scheduleDeletion(file.path);
     }
   }
 
@@ -319,7 +458,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
 
               // ── Language selectors ─────────────────────────────────
-              _LanguageSelectorRow(),
+              // Hide when the selected text template locks the output
+              // language (it bakes the target language into the prompt
+              // via `{{target_language}} = <fixed>`).
+              Visibility(
+                visible: !_isSelectedTemplateFixedLanguage,
+                maintainState: true,
+                child: _LanguageSelectorRow(),
+              ),
               const SizedBox(height: 16),
 
               // ── Input area ─────────────────────────────────────────
@@ -929,11 +1075,75 @@ class _OutputArea extends StatelessWidget {
   const _OutputArea({required this.state});
 
   void _copyText(BuildContext context, String text) {
-    Clipboard.setData(ClipboardData(text: text));
+    Clipboard.setData(ClipboardData(text: toPlainText(text)));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(AppLocalizations.of(context).homeCopiedToClipboard),
         duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  /// Shows a bottom sheet letting the user pick between copying the
+  /// translation as plain text (Markdown stripped) or as raw Markdown.
+  ///
+  /// Triggered by long-pressing the copy button. The single tap path still
+  /// copies plain text (the safer default).
+  Future<void> _showCopyOptions(BuildContext context, String text) async {
+    final l10n = AppLocalizations.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                l10n.copyOptionsTitle,
+                style: Theme.of(sheetCtx).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.short_text),
+              title: Text(l10n.copyAsPlain),
+              subtitle: Text(l10n.sheetPlainSubtitle),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await Clipboard.setData(
+                  ClipboardData(text: toPlainText(text)),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.homeCopiedToClipboard),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: Text(l10n.copyAsMarkdown),
+              subtitle: Text(l10n.sheetCopyMarkdownSubtitle),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await Clipboard.setData(ClipboardData(text: text));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.homeCopiedToClipboard),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -960,6 +1170,7 @@ class _OutputArea extends StatelessWidget {
                   icon: const Icon(Icons.copy, size: 20),
                   tooltip: l10n.homeCopyTooltip,
                   onPressed: () => _copyText(context, partial),
+                  onLongPress: () => _showCopyOptions(context, partial),
                 ),
               ],
             ),
@@ -980,6 +1191,7 @@ class _OutputArea extends StatelessWidget {
                     icon: const Icon(Icons.copy, size: 20),
                     tooltip: l10n.homeCopyTooltip,
                     onPressed: () => _copyText(context, fullText),
+                    onLongPress: () => _showCopyOptions(context, fullText),
                   ),
                 ],
               ),

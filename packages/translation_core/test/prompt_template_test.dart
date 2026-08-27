@@ -112,6 +112,12 @@ void main() {
         expect(copy.substituteTargetLanguage, isFalse);
         expect(textTemplate.substituteTargetLanguage, isTrue);
       });
+
+      test('copies with new outputLanguageFixed', () {
+        final copy = textTemplate.copyWith(outputLanguageFixed: true);
+        expect(copy.outputLanguageFixed, isTrue);
+        expect(textTemplate.outputLanguageFixed, isFalse);
+      });
     });
 
     group('fromJson', () {
@@ -170,6 +176,22 @@ void main() {
         expect(template.substituteTargetLanguage, isTrue);
       });
 
+      test(
+        'outputLanguageFixed defaults to false when missing (back-compat)',
+        () {
+          final json = {
+            'id': 'tpl-3b',
+            'profileId': 'profile-1',
+            'name': 'Old JSON',
+            'systemPrompt': 'Prompt',
+            'supportsText': true,
+            'supportsImage': false,
+          };
+          final template = PromptTemplate.fromJson(json);
+          expect(template.outputLanguageFixed, isFalse);
+        },
+      );
+
       test('parses substituteTargetLanguage: false from JSON', () {
         final json = {
           'id': 'tpl-4',
@@ -182,6 +204,20 @@ void main() {
         };
         final template = PromptTemplate.fromJson(json);
         expect(template.substituteTargetLanguage, isFalse);
+      });
+
+      test('parses outputLanguageFixed: true from JSON', () {
+        final json = {
+          'id': 'tpl-5',
+          'profileId': 'profile-1',
+          'name': 'Fixed Language',
+          'systemPrompt': 'You are an Arabic-only assistant.',
+          'supportsText': true,
+          'supportsImage': false,
+          'outputLanguageFixed': true,
+        };
+        final template = PromptTemplate.fromJson(json);
+        expect(template.outputLanguageFixed, isTrue);
       });
     });
 
@@ -196,12 +232,19 @@ void main() {
         expect(json['supportsImage'], isFalse);
         expect(json['isBuiltIn'], isTrue);
         expect(json['substituteTargetLanguage'], isTrue);
+        expect(json['outputLanguageFixed'], isFalse);
       });
 
       test('serializes substituteTargetLanguage: false', () {
         final template = textTemplate.copyWith(substituteTargetLanguage: false);
         final json = template.toJson();
         expect(json['substituteTargetLanguage'], isFalse);
+      });
+
+      test('serializes outputLanguageFixed: true', () {
+        final template = textTemplate.copyWith(outputLanguageFixed: true);
+        final json = template.toJson();
+        expect(json['outputLanguageFixed'], isTrue);
       });
     });
 
@@ -214,6 +257,35 @@ void main() {
       test('fromJson(toJson(x)) returns original for image template', () {
         final roundTripped = PromptTemplate.fromJson(imageTemplate.toJson());
         expect(roundTripped, equals(imageTemplate));
+      });
+    });
+
+    group('legacy fields — graceful ignore on read', () {
+      test(
+        'fromJson ignores V2 thinking/stream keys (back-compat with old saves)',
+        () {
+          final json = {
+            'id': 'tpl-legacy',
+            'profileId': 'profile-1',
+            'name': 'Legacy V2',
+            'systemPrompt': 'Prompt',
+            'supportsText': true,
+            'supportsImage': false,
+            'enableThinking': true,
+            'stream': true,
+            'maxOutputWords': 5000,
+          };
+          final template = PromptTemplate.fromJson(json);
+          // Fields are silently dropped — no error, no exception.
+          expect(template.name, 'Legacy V2');
+        },
+      );
+
+      test('toJson never writes removed fields', () {
+        final json = textTemplate.toJson();
+        expect(json.containsKey('enableThinking'), isFalse);
+        expect(json.containsKey('stream'), isFalse);
+        expect(json.containsKey('maxOutputWords'), isFalse);
       });
     });
   });

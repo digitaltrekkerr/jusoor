@@ -1,10 +1,16 @@
+// Copyright (c) 2026 Jusoor. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file in the root of the source tree.
+
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
 import '../exceptions/translation_exception.dart';
+import '../exceptions/translation_cancelled_exception.dart';
 import '../models/translation_request.dart';
 import '../models/translation_provider.dart';
+import '../utils/dio_factory.dart';
 import '../utils/response_path_extractor.dart';
 import '../utils/sse_parser.dart';
 import '../utils/variable_substitutor.dart';
@@ -31,7 +37,7 @@ class GeminiProvider implements TranslationProvider {
     Dio? dio,
     this.stream = true,
     this.visionModel,
-  }) : _dio = dio ?? Dio();
+  }) : _dio = dio ?? createTranslationDio();
 
   String _buildEndpointUrl(String modelToUse) {
     if (stream) {
@@ -54,21 +60,29 @@ class GeminiProvider implements TranslationProvider {
       );
       final data = response.data as Map<String, dynamic>;
       final models = data['models'] as List<dynamic>;
-      return models
-          .map((m) {
-            final name = (m as Map<String, dynamic>)['name'] as String;
-            return name.startsWith('models/') ? name.substring(7) : name;
-          })
-          .toList();
+      return models.map((m) {
+        final name = (m as Map<String, dynamic>)['name'] as String;
+        return name.startsWith('models/') ? name.substring(7) : name;
+      }).toList();
     } on DioException catch (e) {
-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
+      throw TranslationException(
+        e.message ?? 'Failed to fetch models',
+        statusCode: e.response?.statusCode,
+      );
     } catch (e) {
       throw TranslationException('Unexpected error fetching models: $e');
     }
   }
 
   @override
-  Stream<String> translate(TranslationRequest request) async* {
+  Stream<String> translate(
+    TranslationRequest request, {
+    CancelToken? cancelToken,
+  }) async* {
+    if (request.inputText.trim().isEmpty &&
+        (request.imageBase64 == null || request.imageBase64!.isEmpty)) {
+      throw const TranslationException('Empty input: nothing to translate.');
+    }
     final isVision =
         request.imageBase64 != null && request.imageBase64!.isNotEmpty;
     final effectiveModel = isVision ? (visionModel ?? model) : model;
@@ -78,10 +92,16 @@ class GeminiProvider implements TranslationProvider {
 
     try {
       if (stream) {
-        yield* _handleStreamResponse(effectiveModel, bodyJson);
+        yield* _handleStreamResponse(effectiveModel, bodyJson, cancelToken);
       } else {
-        yield await _handleNonStreamResponse(effectiveModel, bodyJson);
+        yield await _handleNonStreamResponse(
+          effectiveModel,
+          bodyJson,
+          cancelToken,
+        );
       }
+    } on TranslationCancelledException {
+      rethrow;
     } on TranslationException {
       rethrow;
     } catch (e) {
@@ -92,37 +112,60 @@ class GeminiProvider implements TranslationProvider {
   Stream<String> _handleStreamResponse(
     String effectiveModel,
     Map<String, dynamic> bodyJson,
+    CancelToken? cancelToken,
   ) async* {
-    final ResponseBody responseBody;
+    final ResponseBody? responseBody;
     try {
       final response = await _dio.post<ResponseBody>(
         _buildEndpointUrl(effectiveModel),
         data: bodyJson,
         options: Options(headers: _headers, responseType: ResponseType.stream),
+        cancelToken: cancelToken,
       );
-      responseBody = response.data!;
+      responseBody = response.data;
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
       throw TranslationException(
         e.message ?? 'HTTP request failed',
         statusCode: e.response?.statusCode,
       );
     }
 
+    if (responseBody == null) {
+      throw const TranslationException('Empty response body');
+    }
+
     final parser = SSEParser(responsePath: _kGeminiResponsePath);
 
-    await for (final chunk in responseBody.stream.cast<List<int>>().transform(
-      utf8.decoder,
-    )) {
-      final contents = parser.parseChunk(chunk);
-      for (final content in contents) {
-        yield content;
+    try {
+      await for (final chunk in responseBody.stream.cast<List<int>>().transform(
+        utf8.decoder,
+      )) {
+        final contents = parser.parseChunk(chunk);
+        for (final content in contents) {
+          yield content;
+        }
       }
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
+      rethrow;
+    }
+
+    // Stream may end silently on cancel (e.g. server closes the connection
+    // without a DioException); surface it as a cancellation.
+    if (cancelToken?.isCancelled == true) {
+      throw const TranslationCancelledException();
     }
   }
 
   Future<String> _handleNonStreamResponse(
     String effectiveModel,
     Map<String, dynamic> bodyJson,
+    CancelToken? cancelToken,
   ) async {
     final Response<Map<String, dynamic>> response;
     try {
@@ -130,8 +173,12 @@ class GeminiProvider implements TranslationProvider {
         _buildEndpointUrl(effectiveModel),
         data: bodyJson,
         options: Options(headers: _headers, responseType: ResponseType.json),
+        cancelToken: cancelToken,
       );
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
       throw TranslationException(
         e.message ?? 'HTTP request failed',
         statusCode: e.response?.statusCode,

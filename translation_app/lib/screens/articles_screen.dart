@@ -19,6 +19,7 @@ class ArticlesScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final languageCode = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsArticles)),
@@ -40,7 +41,7 @@ class ArticlesScreen extends StatelessWidget {
                 contentPadding:
                     const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
                 title: Text(
-                  article.title,
+                  article.titleFor(languageCode),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -50,7 +51,7 @@ class ArticlesScreen extends StatelessWidget {
                 subtitle: Padding(
                   padding: const EdgeInsetsDirectional.only(top: 4),
                   child: Text(
-                    article.excerpt,
+                    article.excerptFor(languageCode),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

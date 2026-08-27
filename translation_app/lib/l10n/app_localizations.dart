@@ -218,6 +218,12 @@ abstract class AppLocalizations {
   /// **'Translate'**
   String get homeTranslateButton;
 
+  /// Chip label indicating the source language was detected automatically, shown in the translation detail header.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detected'**
+  String get historyAutoDetected;
+
   /// Clear-input secondary button label.
   ///
   /// In en, this message translates to:
@@ -289,6 +295,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not read file bytes.'**
   String get homeErrorFileBytes;
+
+  /// Snackbar shown when a shared or imported file exceeds the 50 MB ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large to open (over 50 MB). Pick a smaller file.'**
+  String get shareFileTooLarge;
 
   /// Snackbar message warning the user that a large file will be split into chunks.
   ///
@@ -523,6 +535,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quick guides & how-it-works'**
   String get settingsArticlesSubtitle;
+
+  /// Title of the Tips page and of the tile that opens it from Settings → Help & Support.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get settingsTips;
+
+  /// Subtitle under the 'Tips' tile in Settings → Help & Support.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick tips & step-by-step guides'**
+  String get settingsTipsSubtitle;
+
+  /// Section header at the top of the Tips page listing actionable advice.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick tips'**
+  String get tipsQuickTipsHeader;
+
+  /// Section header on the Tips page listing how-to-use steps.
+  ///
+  /// In en, this message translates to:
+  /// **'How to use the app'**
+  String get tipsUsageHeader;
+
+  /// Section header on the Tips page linking to the setup articles.
+  ///
+  /// In en, this message translates to:
+  /// **'Step-by-step setup'**
+  String get tipsSetupHeader;
 
   /// Error message shown inside the article reader screen when its Markdown fails to load.
   ///
@@ -944,6 +986,18 @@ abstract class AppLocalizations {
   /// **'Replace the {target_language} placeholder in the prompt with the chosen language before sending.'**
   String tplSubSubtitle(String target_language);
 
+  /// Title of the switch that marks a template as having a fixed output language.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed output language (no variable)'**
+  String get tplOutLangFixedTitle;
+
+  /// Subtitle of the fixed-output-language switch.
+  ///
+  /// In en, this message translates to:
+  /// **'This template works without a target language variable — the language selector will be hidden in the home screen, and it won\'t be assignable to the overlay.'**
+  String get tplOutLangFixedSubtitle;
+
   /// Label of the floating save button in the template editor.
   ///
   /// In en, this message translates to:
@@ -1015,6 +1069,546 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version {version} is available.'**
   String updateAvailableSubtitle(String version);
+
+  /// Option in the copy bottom sheet that copies the translation stripped of Markdown formatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as plain text'**
+  String get copyAsPlain;
+
+  /// Option in the copy bottom sheet that copies the translation as raw Markdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as Markdown'**
+  String get copyAsMarkdown;
+
+  /// Option in the share bottom sheet that shares the translation stripped of Markdown formatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Share as plain text'**
+  String get shareAsPlain;
+
+  /// Option in the share bottom sheet that shares the translation as a .md file (current behavior).
+  ///
+  /// In en, this message translates to:
+  /// **'Share as Markdown'**
+  String get shareAsMarkdown;
+
+  /// Option in the share bottom sheet that lets the user save the translation as a file via the system share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to file'**
+  String get saveToFile;
+
+  /// Title of the bottom sheet shown on long-press of the copy button to let the user pick plain vs Markdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy options'**
+  String get copyOptionsTitle;
+
+  /// Title of the bottom sheet shown when the share button is tapped, letting the user pick plain, Markdown, or save-to-file.
+  ///
+  /// In en, this message translates to:
+  /// **'Share options'**
+  String get shareOptionsTitle;
+
+  /// Subtitle under the copy/share-as-plain-text options in the copy/share bottom sheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Without Markdown formatting'**
+  String get sheetPlainSubtitle;
+
+  /// Subtitle under the share-as-Markdown-file option in the share bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Text file with original formatting'**
+  String get sheetMarkdownFileSubtitle;
+
+  /// Subtitle under the copy-as-Markdown option in the copy bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'With original formatting'**
+  String get sheetCopyMarkdownSubtitle;
+
+  /// Subtitle under the save-to-file option in the share bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the destination from the share sheet'**
+  String get sheetSaveToFileSubtitle;
+
+  /// Generic label for a Name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get commonName;
+
+  /// Generic Delete button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get commonDelete;
+
+  /// Generic Edit tooltip/label.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get commonEdit;
+
+  /// Generic Save button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get commonSave;
+
+  /// Small badge shown on built-in templates and provider profiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get badgeBuiltIn;
+
+  /// Small capability badge label for text translation.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get badgeText;
+
+  /// Small capability badge label for image translation.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get badgeImage;
+
+  /// Title of the API Keys screen and its AppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'API Keys'**
+  String get apiKeysTitle;
+
+  /// Tooltip of the AppBar button that opens the add-API-key dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Add API Key'**
+  String get apiKeysAddTooltip;
+
+  /// Empty-state message shown when the user has no API keys.
+  ///
+  /// In en, this message translates to:
+  /// **'No API keys yet. Tap + to add one.'**
+  String get apiKeysEmptyState;
+
+  /// Trailing call-to-action button that adds a new API key.
+  ///
+  /// In en, this message translates to:
+  /// **'Add new key'**
+  String get apiKeysAddNewButton;
+
+  /// Title of the dialog that creates an API key.
+  ///
+  /// In en, this message translates to:
+  /// **'Add API Key'**
+  String get apiKeysAddTitle;
+
+  /// Title of the dialog that edits an API key.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit API Key'**
+  String get apiKeysEditTitle;
+
+  /// Hint text of the API key name field.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. OpenRouter, Gemini'**
+  String get apiKeysNameHint;
+
+  /// Validation error when the API key name is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required'**
+  String get apiKeysNameRequired;
+
+  /// Label of the API key value field.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key Value'**
+  String get apiKeysValueLabel;
+
+  /// Validation error when the API key value is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'API key value is required'**
+  String get apiKeysValueRequired;
+
+  /// Snackbar error shown when persisting an API key fails; the technical error detail is appended.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save API key: {error}'**
+  String apiKeysSaveFailed(String error);
+
+  /// Title of the API key deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete API Key?'**
+  String get apiKeysDeleteTitle;
+
+  /// Body of the API key deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This cannot be undone.\n\nProfiles using this key will have their API key reference removed.'**
+  String apiKeysDeleteBody(String name);
+
+  /// Placeholder shown when an API key has no stored value.
+  ///
+  /// In en, this message translates to:
+  /// **'(empty)'**
+  String get apiKeysEmptyValue;
+
+  /// Hint text of the search bar on the History screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Search translations...'**
+  String get historySearchHint;
+
+  /// Tooltip of the clear-all-history AppBar action.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all history'**
+  String get historyClearAllTooltip;
+
+  /// Snackbar shown after deleting a history record.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation deleted'**
+  String get historyDeletedSnackbar;
+
+  /// Undo action label on the deletion snackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'UNDO'**
+  String get historyUndoAction;
+
+  /// Title of the clear-all-history confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All History'**
+  String get historyClearAllTitle;
+
+  /// Body of the clear-all-history confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently delete all translation history. This action cannot be undone.'**
+  String get historyClearAllBody;
+
+  /// Confirm button of the clear-all-history dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get historyClearAllButton;
+
+  /// Empty-search message; the query is wrapped in LRI/PDI isolates at the call site so mixed-script queries keep their order.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \'{query}\''**
+  String historyNoResults(String query);
+
+  /// Empty-state message shown when there is no translation history.
+  ///
+  /// In en, this message translates to:
+  /// **'No translation history yet'**
+  String get historyEmptyState;
+
+  /// Error-state headline shown when the history list fails to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load history'**
+  String get historyLoadFailed;
+
+  /// Date label for a history record created today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get historyToday;
+
+  /// Date label for a history record created yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get historyYesterday;
+
+  /// Date label for a history record older than yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 day ago} other{{count} days ago}}'**
+  String historyDaysAgo(int count);
+
+  /// AppBar title of the history detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation Details'**
+  String get historyDetailTitle;
+
+  /// Section label above the original input text on the history detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get historyInputLabel;
+
+  /// Section label above the translated output on the history detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get historyOutputLabel;
+
+  /// Tooltip of the AppBar button that opens the template editor for a new template.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Template'**
+  String get templatesAddTooltip;
+
+  /// Empty-state message shown when the user has no templates.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates yet. Tap + to add one.'**
+  String get templatesEmptyState;
+
+  /// Group header in the templates list for templates whose profile no longer exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Profile'**
+  String get templatesUnknownProfile;
+
+  /// Title of the template deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Template?'**
+  String get templatesDeleteTitle;
+
+  /// Body of the template deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This cannot be undone.'**
+  String templatesDeleteBody(String name);
+
+  /// Warning shown in the template deletion dialog for built-in templates.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a built-in template. You can restore it by going to Settings and tapping \"Restore Built-in Items\".'**
+  String get templatesBuiltInWarning;
+
+  /// Tooltip of the AppBar button that opens the profile editor for a new profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Profile'**
+  String get profilesAddTooltip;
+
+  /// Empty-state message shown when the user has no provider profiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No profiles yet. Tap + to add one.'**
+  String get profilesEmptyState;
+
+  /// Title of the profile deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Profile?'**
+  String get profilesDeleteTitle;
+
+  /// Body of the profile deletion confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This cannot be undone.'**
+  String profilesDeleteBody(String name);
+
+  /// Warning shown in the profile deletion dialog for built-in profiles.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a built-in profile. You can restore it by going to Settings and tapping \"Restore Built-in Items\".'**
+  String get profilesBuiltInWarning;
+
+  /// Model line on a profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String profilesModelLabel(String model);
+
+  /// API key line on a profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key: {name}'**
+  String profilesApiKeyLabel(String name);
+
+  /// AppBar title of the profile editor when editing an existing profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Profile'**
+  String get profileEditTitle;
+
+  /// AppBar title of the profile editor when creating a new profile.
+  ///
+  /// In en, this message translates to:
+  /// **'New Profile'**
+  String get profileNewTitle;
+
+  /// Hint text of the profile name field.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. My OpenRouter Profile'**
+  String get profileNameHint;
+
+  /// Section label of the provider type selector.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider Type'**
+  String get profileProviderTypeLabel;
+
+  /// Label of the model selector field.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get profileModelLabel;
+
+  /// Label of the vision model selector field.
+  ///
+  /// In en, this message translates to:
+  /// **'Vision Model (optional)'**
+  String get profileVisionModelLabel;
+
+  /// Placeholder in the model field when no model is chosen yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a model'**
+  String get profileSelectModelHint;
+
+  /// Placeholder in the model fields when no API key is selected yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select API key first'**
+  String get profileSelectApiKeyFirstHint;
+
+  /// Placeholder in the vision model field when no vision model is chosen yet.
+  ///
+  /// In en, this message translates to:
+  /// **'For image translation'**
+  String get profileVisionModelPlaceholder;
+
+  /// Label of the API key selector field.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get profileApiKeyLabel;
+
+  /// Label of the fallback API key selector field.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback API Key (optional)'**
+  String get profileFallbackApiKeyLabel;
+
+  /// Title of the model picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Model'**
+  String get profileSelectModelTitle;
+
+  /// Title of the vision model picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Vision Model'**
+  String get profileSelectVisionModelTitle;
+
+  /// Title of the API key picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select API Key'**
+  String get profileSelectApiKeyTitle;
+
+  /// Title of the fallback API key picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Fallback API Key'**
+  String get profileSelectFallbackApiKeyTitle;
+
+  /// Search hint of the model picker bottom sheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Search models...'**
+  String get profileSearchModelsHint;
+
+  /// Tooltip of the refresh-models icon button.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh models'**
+  String get profileRefreshModelsTooltip;
+
+  /// Snackbar error shown when fetching the model list fails; the technical error detail is appended.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load models: {error}'**
+  String profileLoadModelsFailed(String error);
+
+  /// Snackbar error shown when saving a profile without a name.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile name is required.'**
+  String get profileNameRequired;
+
+  /// Snackbar error shown when saving a profile without a chosen model.
+  ///
+  /// In en, this message translates to:
+  /// **'Model selection is required.'**
+  String get profileModelRequired;
+
+  /// Validation error when the Base URL has no valid scheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid URL with http:// or https:// scheme.'**
+  String get profileBaseUrlInvalid;
+
+  /// Validation error when a remote Base URL uses plain http instead of https.
+  ///
+  /// In en, this message translates to:
+  /// **'Insecure HTTP URLs are not allowed for remote endpoints. Use https:// (http is only permitted for localhost/127.0.0.1).'**
+  String get profileBaseUrlHttpsRequired;
+
+  /// Validation error when the Base URL cannot be parsed as a URL.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid URL starting with https:// (or http://localhost for local models).'**
+  String get profileBaseUrlHttpsHint;
+
+  /// Section header for the OpenAI-compatible provider settings.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI-Compatible Settings'**
+  String get profileOpenAiSettingsTitle;
+
+  /// Label of the Base URL field for OpenAI-compatible providers.
+  ///
+  /// In en, this message translates to:
+  /// **'Base URL'**
+  String get profileBaseUrlLabel;
+
+  /// Title of the bottom sheet shown when tapping the model field without an API key.
+  ///
+  /// In en, this message translates to:
+  /// **'An API key is required first'**
+  String get profileModelAccessTitle;
+
+  /// Body of the model-access bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an existing key from your list, or add a new one to start fetching models.'**
+  String get profileModelAccessBody;
+
+  /// Option that opens the API key picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an existing key'**
+  String get profileModelAccessPickExisting;
+
+  /// Option that opens the API keys screen to add a new key.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a new key'**
+  String get profileModelAccessAddNew;
 }
 
 class _AppLocalizationsDelegate

@@ -1,0 +1,50 @@
+diff --git a/translation_app/lib/main.dart b/translation_app/lib/main.dart
+index 6017b78..49c6176 100644
+--- a/translation_app/lib/main.dart
++++ b/translation_app/lib/main.dart
+@@ -74,14 +74,17 @@ Future<ThemeMode> _resolveOverlayThemeMode() async {
+         return ThemeMode.light;
+       case 'dark':
+         return ThemeMode.dark;
++      case 'system':
++        return ThemeMode.system;
+       default:
+-        // Absent value → keep the historical always-dark look.
+-        return ThemeMode.dark;
++        // Truly absent (fresh install) or unrecognized value — track the
++        // device theme so light users get a light overlay, not a surprise.
++        return ThemeMode.system;
+     }
+   } catch (e) {
+     debugPrint('[OverlayMain] Failed to read theme mode, falling back to '
+-        'dark: $e');
+-    return ThemeMode.dark;
++        'system: $e');
++    return ThemeMode.system;
+   }
+ }
+ 
+@@ -95,7 +98,9 @@ class _OverlayApp extends StatelessWidget {
+     return FutureBuilder<ThemeMode>(
+       future: _resolveOverlayThemeMode(),
+       builder: (context, snapshot) {
+-        final themeMode = snapshot.data ?? ThemeMode.dark;
++        // Default to 'system' (tracks the device) while prefs load so a
++        // brief async read never flashes the wrong theme.
++        final themeMode = snapshot.data ?? ThemeMode.system;
+         return MaterialApp(
+           debugShowCheckedModeBanner: false,
+           theme: _overlayTheme(Brightness.light),
+@@ -981,6 +986,12 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+                               vertical: 10,
+                             ),
+                             backgroundColor: _primaryColor,
++                            // Override the foreground so the 'Translate'
++                            // label stays legible against the themed
++                            // primary color in both light and dark modes.
++                            foregroundColor: Theme.of(context)
++                                .colorScheme
++                                .onPrimary,
+                           ),
+                         ),
+                       ),

@@ -1,10 +1,16 @@
+// Copyright (c) 2026 Jusoor. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file in the root of the source tree.
+
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
 import '../exceptions/translation_exception.dart';
+import '../exceptions/translation_cancelled_exception.dart';
 import '../models/translation_request.dart';
 import '../models/translation_provider.dart';
+import '../utils/dio_factory.dart';
 import '../utils/response_path_extractor.dart';
 import '../utils/sse_parser.dart';
 import '../utils/variable_substitutor.dart';
@@ -41,7 +47,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
     this.visionModel,
     this.stream = true,
     Dio? dio,
-  }) : _dio = dio ?? Dio();
+  }) : _dio = dio ?? createTranslationDio();
 
   String get _endpointUrl {
     final base = baseUrl.endsWith('/')
@@ -64,16 +70,28 @@ class OpenAICompatibleProvider implements TranslationProvider {
       );
       final data = response.data as Map<String, dynamic>;
       final models = data['data'] as List<dynamic>;
-      return models.map((m) => (m as Map<String, dynamic>)['id'] as String).toList();
+      return models
+          .map((m) => (m as Map<String, dynamic>)['id'] as String)
+          .toList();
     } on DioException catch (e) {
-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
+      throw TranslationException(
+        e.message ?? 'Failed to fetch models',
+        statusCode: e.response?.statusCode,
+      );
     } catch (e) {
       throw TranslationException('Unexpected error fetching models: $e');
     }
   }
 
   @override
-  Stream<String> translate(TranslationRequest request) async* {
+  Stream<String> translate(
+    TranslationRequest request, {
+    CancelToken? cancelToken,
+  }) async* {
+    if (request.inputText.trim().isEmpty &&
+        (request.imageBase64 == null || request.imageBase64!.isEmpty)) {
+      throw const TranslationException('Empty input: nothing to translate.');
+    }
     final variableMap = VariableSubstitutor.buildVariableMap(request, apiKey);
     variableMap['model'] = model;
 
@@ -97,6 +115,10 @@ class OpenAICompatibleProvider implements TranslationProvider {
         substituteTargetLanguage: request.substituteTargetLanguage,
       );
       bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+      // The generic body template hardcodes "stream":true; override it with
+      // the provider's actual [stream] flag so non-streaming requests send
+      // a truthful body to the endpoint.
+      bodyJson['stream'] = stream;
     }
 
     final isStreaming = bodyJson['stream'] == true;
@@ -109,14 +131,15 @@ class OpenAICompatibleProvider implements TranslationProvider {
           headers: substitutedHeaders,
           responseType: isStreaming ? ResponseType.stream : ResponseType.json,
         ),
+        cancelToken: cancelToken,
       );
 
       if (isStreaming) {
-        yield* _handleStreamResponse(response.data);
+        yield* _handleStreamResponse(response.data, cancelToken);
       } else {
         final dynamic responseData = response.data;
         if (responseData is ResponseBody) {
-          yield* _handleStreamResponse(responseData);
+          yield* _handleStreamResponse(responseData, cancelToken);
         } else if (responseData is Map<String, dynamic>) {
           yield ResponsePathExtractor.extract(
             responseData,
@@ -129,10 +152,15 @@ class OpenAICompatibleProvider implements TranslationProvider {
         }
       }
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
       throw TranslationException(
         e.message ?? 'HTTP request failed',
         statusCode: e.response?.statusCode,
       );
+    } on TranslationCancelledException {
+      rethrow;
     } on TranslationException {
       rethrow;
     } catch (e) {
@@ -148,7 +176,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
       substituteTargetLanguage: request.substituteTargetLanguage,
     );
 
-    return {
+    return <String, dynamic>{
       'model': effectiveModel,
       'messages': [
         {'role': 'system', 'content': resolvedPrompt},
@@ -175,20 +203,35 @@ class OpenAICompatibleProvider implements TranslationProvider {
     };
   }
 
-  Stream<String> _handleStreamResponse(ResponseBody? responseBody) async* {
+  Stream<String> _handleStreamResponse(
+    ResponseBody? responseBody,
+    CancelToken? cancelToken,
+  ) async* {
     if (responseBody == null) {
       throw const TranslationException('Empty response body');
     }
 
     final parser = SSEParser(responsePath: _kDefaultStreamingResponsePath);
 
-    await for (final chunk in responseBody.stream.cast<List<int>>().transform(
-      utf8.decoder,
-    )) {
-      final contents = parser.parseChunk(chunk);
-      for (final content in contents) {
-        yield content;
+    try {
+      await for (final chunk in responseBody.stream.cast<List<int>>().transform(
+        utf8.decoder,
+      )) {
+        final contents = parser.parseChunk(chunk);
+        for (final content in contents) {
+          yield content;
+        }
       }
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
+      rethrow;
+    }
+
+    // Stream may end silently on cancel; surface it as a cancellation.
+    if (cancelToken?.isCancelled == true) {
+      throw const TranslationCancelledException();
     }
   }
 }

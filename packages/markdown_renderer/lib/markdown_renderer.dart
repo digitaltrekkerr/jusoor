@@ -5,3 +5,5 @@
 library;
 
 export 'src/widgets/markdown_view.dart';
+export 'src/widgets/markdown_view_helpers.dart';
+export 'src/utils/markdown_stripper.dart';
