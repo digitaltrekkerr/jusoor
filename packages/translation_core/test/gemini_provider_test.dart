@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:translation_core/src/exceptions/translation_exception.dart';
+import 'package:translation_core/src/exceptions/translation_cancelled_exception.dart';
 import 'package:translation_core/src/models/translation_request.dart';
 import 'package:translation_core/src/providers/gemini_provider.dart';
 
@@ -253,8 +254,7 @@ void main() {
           final request = TranslationRequest(
             inputText: 'Hello',
             targetLanguage: 'French',
-            systemPrompt:
-                'Translate to {{target_language}}.',
+            systemPrompt: 'Translate to {{target_language}}.',
           );
 
           await provider.translate(request).toList();
@@ -319,6 +319,77 @@ void main() {
             systemParts[0]['text'],
             'Translate to Spanish.\nPreserve formatting.',
           );
+        },
+      );
+    });
+
+    group('thinking field absence (regression guard)', () {
+      test(
+        'text body never carries a generationConfig.thinkingConfig key '
+        'regardless of model',
+        () async {
+          Future<Map<String, dynamic>> bodyFor(String model) async {
+            capturedRequest = null;
+            final dio = createMockStreamingDio();
+            final provider = GeminiProvider(
+              apiKey: 'test-key',
+              model: model,
+              dio: dio,
+            );
+            await provider
+                .translate(
+                  TranslationRequest(
+                    inputText: 'Hello',
+                    targetLanguage: 'Spanish',
+                    systemPrompt: 'Translate.',
+                  ),
+                )
+                .toList();
+            return capturedRequest!.data as Map<String, dynamic>;
+          }
+
+          for (final model in const [
+            'gemini-2.5-pro',
+            'gemini-2-5-pro',
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash',
+            'gemma-3-27b-it',
+          ]) {
+            final body = await bodyFor(model);
+            expect(
+              body.containsKey('generationConfig'),
+              isFalse,
+              reason:
+                  'V1 wire shape — no generationConfig is sent for $model',
+            );
+          }
+        },
+      );
+
+      test(
+        'stale requests carrying enableThinking JSON still produce no '
+        'thinkingConfig on the wire',
+        () async {
+          final dio = createMockStreamingDio();
+          final provider = GeminiProvider(
+            apiKey: 'test-key',
+            model: 'gemini-2.5-pro',
+            dio: dio,
+          );
+          await provider
+              .translate(
+                TranslationRequest.fromJson(<String, dynamic>{
+                  'inputText': 'Hello',
+                  'targetLanguage': 'Spanish',
+                  'systemPrompt': 'Translate.',
+                  'enableThinking': true,
+                }),
+              )
+              .toList();
+
+          final body = capturedRequest!.data as Map<String, dynamic>;
+          expect(body.containsKey('generationConfig'), isFalse);
         },
       );
     });
@@ -599,6 +670,139 @@ void main() {
           }
         },
       );
+    });
+
+    group('null response body', () {
+      test(
+        'throws TranslationException("Empty response body") on streaming null data',
+        () async {
+          final dio = Dio();
+          dio.interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) {
+                handler.resolve(
+                  Response<ResponseBody>(
+                    requestOptions: options,
+                    data: null,
+                    statusCode: 200,
+                  ),
+                );
+              },
+            ),
+          );
+
+          final provider = GeminiProvider(
+            apiKey: 'test-key',
+            model: 'gemini-2.5-flash',
+            dio: dio,
+          );
+          final request = TranslationRequest(
+            inputText: 'Hello',
+            targetLanguage: 'Spanish',
+          );
+
+          await expectLater(
+            provider.translate(request).toList(),
+            throwsA(
+              isA<TranslationException>().having(
+                (e) => e.message,
+                'message',
+                'Empty response body',
+              ),
+            ),
+          );
+        },
+      );
+    });
+
+    group('cancellation', () {
+      test('cancelling the token throws TranslationCancelledException',
+          () async {
+        // A Dio whose request interceptor never resolves — the request
+        // stays in-flight until the CancelToken fires.
+        final dio = Dio();
+        dio.interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              // Intentionally never call handler.next/resolve/reject.
+            },
+          ),
+        );
+
+        final provider = GeminiProvider(
+          apiKey: 'test-key',
+          model: 'gemini-3.5-flash-lite',
+          dio: dio,
+        );
+        final request = TranslationRequest(
+          inputText: 'Hello',
+          targetLanguage: 'Spanish',
+        );
+
+        final token = CancelToken();
+        final expectation = expectLater(
+          provider.translate(request, cancelToken: token).toList(),
+          throwsA(isA<TranslationCancelledException>()),
+        );
+
+        // Give the request a chance to start, then cancel mid-flight.
+        await Future<void>.delayed(Duration.zero);
+        token.cancel();
+        await expectation;
+      });
+
+      test('recovers for a fresh request after cancellation', () async {
+        final dio = Dio();
+        dio.interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              options.cancelToken?.whenCancel.then((_) {
+                handler.reject(
+                  DioException.requestCancelled(
+                    requestOptions: options,
+                    reason: 'cancelled',
+                  ),
+                );
+              });
+            },
+          ),
+        );
+
+        final provider = GeminiProvider(
+          apiKey: 'test-key',
+          model: 'gemini-3.5-flash-lite',
+          dio: dio,
+        );
+        final request = TranslationRequest(
+          inputText: 'Hello',
+          targetLanguage: 'Spanish',
+        );
+
+        final token = CancelToken();
+        final first = expectLater(
+          provider.translate(request, cancelToken: token).toList(),
+          throwsA(isA<TranslationCancelledException>()),
+        );
+        await Future<void>.delayed(Duration.zero);
+        token.cancel();
+        await first;
+
+        // A fresh, uncancelled request on a working dio must succeed —
+        // proves no cancellation state leaked into the provider.
+        final workingDio = createMockStreamingDio(textChunks: const ['Hola']);
+        final provider2 = GeminiProvider(
+          apiKey: 'test-key',
+          model: 'gemini-3.5-flash-lite',
+          dio: workingDio,
+        );
+        final result = await provider2
+            .translate(request)
+            .fold<StringBuffer>(
+              StringBuffer(),
+              (buf, chunk) => buf..write(chunk),
+            );
+        expect(result.toString(), contains('Hola'));
+      });
     });
   });
 }

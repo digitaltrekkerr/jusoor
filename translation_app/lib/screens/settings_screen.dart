@@ -18,6 +18,7 @@ import 'permissions_screen.dart';
 import 'profiles_screen.dart';
 import 'support_screen.dart';
 import 'templates_screen.dart';
+import 'tips_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -259,6 +260,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               context,
             ).push(
               MaterialPageRoute(builder: (_) => const InstructionsScreen()),
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.lightbulb_outline),
+            title: Text(l10n.settingsTips),
+            subtitle: Text(l10n.settingsTipsSubtitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TipsScreen()),
             ),
           ),
           const Divider(height: 1),

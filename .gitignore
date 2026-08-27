@@ -94,3 +94,7 @@ baselineProfiles/
 
 # Internal planning (local only)
 PLAN.md
+
+# Internal docs & planning (never publish)
+docs/reports/
+TASKS.md

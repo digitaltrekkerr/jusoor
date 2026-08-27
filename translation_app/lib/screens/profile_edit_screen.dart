@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:translation_core/translation_core.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
+import '../screens/api_keys_screen.dart';
 import '../widgets/selection_modal.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -12,6 +16,60 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<ProfileEditScreen> createState() => _ProfileEditScreenState();
+}
+
+/// Verdict of [validateProviderBaseUrl].
+sealed class BaseUrlVerdict {
+  const BaseUrlVerdict();
+}
+
+/// URL is acceptable (https, or http to a loopback host).
+class BaseUrlOk extends BaseUrlVerdict {
+  const BaseUrlOk();
+}
+
+/// URL could not be parsed or has no scheme.
+class BaseUrlMalformed extends BaseUrlVerdict {
+  const BaseUrlMalformed();
+}
+
+/// URL has a scheme other than http/https.
+class BaseUrlBadScheme extends BaseUrlVerdict {
+  const BaseUrlBadScheme();
+}
+
+/// URL is http to a non-loopback (remote) host — rejected.
+class BaseUrlInsecureRemote extends BaseUrlVerdict {
+  const BaseUrlInsecureRemote();
+}
+
+/// Validates a custom endpoint URL string.
+///
+/// Enforces HTTPS for remote endpoints; the only cleartext exceptions are
+/// loopback addresses (`localhost`, `127.0.0.1`, `[::1]`) used by local
+/// model servers such as Ollama.
+BaseUrlVerdict validateProviderBaseUrl(String raw) {
+  final trimmed = raw.trim();
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null || !uri.hasScheme) {
+    return const BaseUrlMalformed();
+  }
+  final scheme = uri.scheme.toLowerCase();
+  if (scheme != 'http' && scheme != 'https') {
+    return const BaseUrlBadScheme();
+  }
+  if (scheme == 'https') {
+    return const BaseUrlOk();
+  }
+  // Allow http:// only for loopback hosts.
+  final host = uri.host.toLowerCase();
+  if (host == 'localhost' ||
+      host == '127.0.0.1' ||
+      host == '[::1]' ||
+      host == '::1') {
+    return const BaseUrlOk();
+  }
+  return const BaseUrlInsecureRemote();
 }
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
@@ -28,6 +86,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String? _selectedModel;
   String? _selectedVisionModel;
 
+  /// When true, the API Key `InputDecorator` renders with a red border to
+  /// draw the user's attention to it. Set when the user attempts to pick
+  /// a model without selecting an API key first; cleared automatically
+  /// after a short animation (see [_apiKeyHighlightTimer]).
+  bool _apiKeyHighlight = false;
+  Timer? _apiKeyHighlightTimer;
+
   bool get _isEditing => widget.profile != null;
 
   bool get _canFetchModels => _selectedApiKeyId != null;
@@ -42,7 +107,88 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   void dispose() {
     _nameController.dispose();
     _baseUrlController.dispose();
+    _apiKeyHighlightTimer?.cancel();
     super.dispose();
+  }
+
+  /// Triggers a brief red-border highlight on the API Key field so the user
+  /// notices where the dependency lives.
+  void _flashApiKeyHighlight() {
+    _apiKeyHighlightTimer?.cancel();
+    setState(() => _apiKeyHighlight = true);
+    _apiKeyHighlightTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) {
+        setState(() => _apiKeyHighlight = false);
+      }
+    });
+  }
+
+  /// Bottom-sheet picker shown when the user taps the Model / Vision Model
+  /// field while no API key is selected. Offers a fast path to either
+  /// pick an existing key or add a new one.
+  Future<void> _showModelAccessDialog() async {
+    final l10n = AppLocalizations.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        final colorScheme = Theme.of(sheetCtx).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.key_off, color: colorScheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.profileModelAccessTitle,
+                        style: Theme.of(sheetCtx).textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  l10n.profileModelAccessBody,
+                  style: Theme.of(sheetCtx).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.key),
+                title: Text(l10n.profileModelAccessPickExisting),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _flashApiKeyHighlight();
+                  _selectApiKey();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_circle_outline),
+                title: Text(l10n.profileModelAccessAddNew),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ApiKeysScreen(),
+                      fullscreenDialog: true,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _loadProfile() {
@@ -146,7 +292,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       setState(() => _isLoadingModels = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load models: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).profileLoadModelsFailed('$e'),
+            ),
+          ),
         );
       }
     }
@@ -155,14 +305,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Future<void> _selectModel() async {
     if (!_canFetchModels || _availableModels.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context);
     final result = await showSelectionModal<String>(
       context: context,
-      title: 'Select Model',
+      title: l10n.profileSelectModelTitle,
       options: _availableModels
           .map((m) => SelectionOption<String>(value: m, label: m))
           .toList(),
       selectedValue: _selectedModel,
-      searchHint: 'Search models...',
+      searchHint: l10n.profileSearchModelsHint,
     );
     if (result != null) {
       setState(() => _selectedModel = result);
@@ -172,14 +323,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Future<void> _selectVisionModel() async {
     if (!_canFetchModels || _availableVisionModels.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context);
     final result = await showSelectionModal<String>(
       context: context,
-      title: 'Select Vision Model',
+      title: l10n.profileSelectVisionModelTitle,
       options: _availableVisionModels
           .map((m) => SelectionOption<String>(value: m, label: m))
           .toList(),
       selectedValue: _selectedVisionModel,
-      searchHint: 'Search models...',
+      searchHint: l10n.profileSearchModelsHint,
     );
     if (result != null) {
       setState(() => _selectedVisionModel = result);
@@ -193,15 +345,22 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         .toList();
 
     if (options.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No API keys available. Add one in Settings.')),
+      // No keys exist yet: take the user directly to the keys manager
+      // instead of showing a dead-end snackbar.
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const ApiKeysScreen(),
+          fullscreenDialog: true,
+        ),
       );
       return;
     }
 
+    final l10n = AppLocalizations.of(context);
     final result = await showSelectionModal<String>(
       context: context,
-      title: 'Select API Key',
+      title: l10n.profileSelectApiKeyTitle,
       options: options,
       selectedValue: _selectedApiKeyId,
     );
@@ -218,15 +377,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Future<void> _selectFallbackApiKey() async {
+    final l10n = AppLocalizations.of(context);
     final apiKeys = ref.read(apiKeysProvider);
     final options = <SelectionOption<String>>[
-      const SelectionOption<String>(value: '', label: '(None)'),
+      SelectionOption<String>(value: '', label: l10n.settingsNoneOption),
       ...apiKeys.map((k) => SelectionOption<String>(value: k.id, label: k.name)),
     ];
 
     final result = await showSelectionModal<String>(
       context: context,
-      title: 'Select Fallback API Key',
+      title: l10n.profileSelectFallbackApiKeyTitle,
       options: options,
       selectedValue: _selectedFallbackApiKeyId ?? '',
     );
@@ -239,23 +399,26 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Widget build(BuildContext context) {
     final apiKeys = ref.watch(apiKeysProvider);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit Profile' : 'New Profile')),
+      appBar: AppBar(
+        title: Text(_isEditing ? l10n.profileEditTitle : l10n.profileNewTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              hintText: 'e.g. My OpenRouter Profile',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.commonName,
+              hintText: l10n.profileNameHint,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
 
-          Text('Provider Type', style: theme.textTheme.titleSmall),
+          Text(l10n.profileProviderTypeLabel, style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<ProviderType>(
             segments: [
@@ -290,7 +453,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
           InputDecorator(
             decoration: InputDecoration(
-              labelText: 'Model',
+              labelText: l10n.profileModelLabel,
               border: const OutlineInputBorder(),
               suffixIcon: _isLoadingModels
                   ? const Padding(
@@ -309,7 +472,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               IconButton(
                                 icon: const Icon(Icons.refresh, size: 20),
                                 onPressed: _isLoadingModels ? null : _fetchModels,
-                                tooltip: 'Refresh models',
+                                tooltip: l10n.profileRefreshModelsTooltip,
                               ),
                           ],
                         )
@@ -317,9 +480,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _canFetchModels ? _selectModel : null,
+              onTap: _canFetchModels ? _selectModel : _showModelAccessDialog,
               child: Text(
-                _selectedModel ?? (_canFetchModels ? 'Select a model' : 'Select API key first'),
+                _selectedModel ??
+                    (_canFetchModels
+                        ? l10n.profileSelectModelHint
+                        : l10n.profileSelectApiKeyFirstHint),
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _selectedModel == null
                       ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
@@ -332,21 +498,24 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
           InputDecorator(
             decoration: InputDecoration(
-              labelText: 'Vision Model (optional)',
+              labelText: l10n.profileVisionModelLabel,
               border: const OutlineInputBorder(),
               suffixIcon: _canFetchModels && _selectedApiKeyId != null
                   ? IconButton(
                       icon: const Icon(Icons.refresh, size: 20),
                       onPressed: _isLoadingModels ? null : _fetchModels,
-                      tooltip: 'Refresh models',
+                      tooltip: l10n.profileRefreshModelsTooltip,
                     )
                   : null,
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _canFetchModels ? _selectVisionModel : null,
+              onTap: _canFetchModels ? _selectVisionModel : _showModelAccessDialog,
               child: Text(
-                _selectedVisionModel ?? (_canFetchModels ? 'For image translation' : 'Select API key first'),
+                _selectedVisionModel ??
+                    (_canFetchModels
+                        ? l10n.profileVisionModelPlaceholder
+                        : l10n.profileSelectApiKeyFirstHint),
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _selectedVisionModel == null
                       ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
@@ -358,9 +527,35 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           const SizedBox(height: 16),
 
           InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'API Key',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.profileApiKeyLabel,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: _apiKeyHighlight
+                    ? BorderSide(
+                        color: theme.colorScheme.error,
+                        width: 2,
+                      )
+                    : BorderSide(color: theme.colorScheme.outline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: _apiKeyHighlight
+                    ? BorderSide(
+                        color: theme.colorScheme.error,
+                        width: 2,
+                      )
+                    : BorderSide(color: theme.colorScheme.primary),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: _apiKeyHighlight
+                    ? BorderSide(
+                        color: theme.colorScheme.error,
+                        width: 2,
+                      )
+                    : BorderSide(color: theme.colorScheme.outline),
+              ),
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -368,7 +563,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               child: Text(
                 _selectedApiKeyId != null
                     ? apiKeys.firstWhere((k) => k.id == _selectedApiKeyId).name
-                    : '(None)',
+                    : l10n.settingsNoneOption,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _selectedApiKeyId == null
                       ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
@@ -380,17 +575,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           const SizedBox(height: 12),
 
           InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Fallback API Key (optional)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.profileFallbackApiKeyLabel,
+              border: const OutlineInputBorder(),
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _selectFallbackApiKey,
               child: Text(
                 _selectedFallbackApiKeyId != null
-                    ? apiKeys.firstWhere((k) => k.id == _selectedFallbackApiKeyId).name
-                    : '(None)',
+                    ? apiKeys
+                        .firstWhere((k) => k.id == _selectedFallbackApiKeyId)
+                        .name
+                    : l10n.settingsNoneOption,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _selectedFallbackApiKeyId == null
                       ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
@@ -405,17 +602,17 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             const Divider(),
             const SizedBox(height: 8),
             Text(
-              'OpenAI-Compatible Settings',
+              l10n.profileOpenAiSettingsTitle,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
 
             TextField(
               controller: _baseUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Base URL',
+              decoration: InputDecoration(
+                labelText: l10n.profileBaseUrlLabel,
                 hintText: 'http://localhost:11434/v1',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -425,26 +622,49 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _saveProfile,
         icon: const Icon(Icons.save),
-        label: const Text('Save'),
+        label: Text(l10n.commonSave),
       ),
     );
   }
 
   Future<void> _saveProfile() async {
+    final l10n = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile name is required.')),
+        SnackBar(content: Text(l10n.profileNameRequired)),
       );
       return;
     }
 
     final model = _selectedModel;
     if (model == null || model.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Model selection is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.profileModelRequired)),
+      );
       return;
+    }
+
+    // Custom endpoints must use HTTPS unless they point at a loopback
+    // address (localhost / 127.0.0.1 / [::1]) — those are the only
+    // cleartext exceptions, for local models such as Ollama.
+    if (_providerType == ProviderType.openaiCompatible) {
+      final raw = _baseUrlController.text.trim();
+      if (raw.isNotEmpty) {
+        final verdict = validateProviderBaseUrl(raw);
+        if (verdict is! BaseUrlOk) {
+          final message = switch (verdict) {
+            BaseUrlMalformed() => l10n.profileBaseUrlHttpsHint,
+            BaseUrlBadScheme() => l10n.profileBaseUrlInvalid,
+            BaseUrlInsecureRemote() => l10n.profileBaseUrlHttpsRequired,
+            BaseUrlOk() => '', // unreachable — handled above
+          };
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+          return;
+        }
+      }
     }
 
     final id = _isEditing

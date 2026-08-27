@@ -10,6 +10,10 @@ import '../widgets/bidi_markdown_view.dart';
 /// through [BiDiMarkdownView], which already handles BiDi direction
 /// detection, RTL-aware markdown layout, and long-text performance
 /// (RegExp hoisting, capped direction-scan window, stable ValueKey).
+///
+/// The body is bilingual: when the app locale is English and an `.en.md`
+/// variant exists for the article, it is loaded; otherwise the Arabic
+/// content is shown.
 class ArticleScreen extends StatefulWidget {
   /// The article to render. Required.
   final AppArticle article;
@@ -23,15 +27,29 @@ class ArticleScreen extends StatefulWidget {
 
 class _ArticleScreenState extends State<ArticleScreen> {
   Future<String>? _future;
+  String _languageCode = 'ar';
+  bool _initialized = false;
+
+  void _reloadForLocale(String languageCode) {
+    if (languageCode == _languageCode && _initialized) return;
+    _initialized = true;
+    _languageCode = languageCode;
+    _future = loadArticleBody(widget.article, languageCode: languageCode);
+  }
 
   @override
-  void initState() {
-    super.initState();
-    _future = loadArticleBody(widget.article);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Loads the correct locale variant on first build and whenever the app
+    // locale changes while this screen is open.
+    _reloadForLocale(Localizations.localeOf(context).languageCode);
   }
 
   Future<void> _retry() {
-    final next = loadArticleBody(widget.article);
+    final next = loadArticleBody(
+      widget.article,
+      languageCode: _languageCode,
+    );
     setState(() => _future = next);
     return next;
   }
@@ -41,7 +59,9 @@ class _ArticleScreenState extends State<ArticleScreen> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.article.title)),
+      appBar: AppBar(
+        title: Text(widget.article.titleFor(_languageCode)),
+      ),
       body: SafeArea(
         child: FutureBuilder<String>(
           future: _future,

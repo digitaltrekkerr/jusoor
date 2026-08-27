@@ -9,6 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_markdown_plus: ^1.0.7
+  strip_markdown: ^1.0.1
   url_launcher: ^6.2.5
 
 dev_dependencies:

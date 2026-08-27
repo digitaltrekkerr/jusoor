@@ -1,20 +1,22 @@
+// Copyright (c) 2026 Jusoor. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file in the root of the source tree.
+
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
 import '../exceptions/translation_exception.dart';
+import '../exceptions/translation_cancelled_exception.dart';
 import '../models/provider_profile.dart';
 import '../models/translation_request.dart';
 import '../models/translation_provider.dart';
+import '../utils/dio_factory.dart';
 import '../utils/sse_parser.dart';
 import '../utils/variable_substitutor.dart';
 
 /// Default OpenRouter API endpoint.
 const _kDefaultEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
-
-/// Default body template for OpenRouter chat completions.
-const _kDefaultBodyTemplate =
-    '{"model":"{{model}}","messages":[{"role":"system","content":"{{system_prompt}}"},{"role":"user","content":"{{input_text}}"}],"stream":true}';
 
 /// Default headers for OpenRouter requests.
 const _kDefaultHeaders = <String, String>{
@@ -39,10 +41,6 @@ class OpenRouterProvider implements TranslationProvider {
   /// Custom endpoint URL. Defaults to the OpenRouter API.
   final String endpointUrl;
 
-  /// Custom body template. Defaults to the OpenRouter chat-completions
-  /// template.
-  final String bodyTemplate;
-
   /// Custom headers. Defaults to standard OpenRouter headers.
   final Map<String, String> headers;
 
@@ -50,11 +48,6 @@ class OpenRouterProvider implements TranslationProvider {
   ///
   /// Defaults to `choices.0.delta.content`.
   final String streamingResponsePath;
-
-  /// Dot-notation path for extracting content from non-streaming responses.
-  ///
-  /// Defaults to `choices.0.message.content`.
-  final String nonStreamingResponsePath;
 
   /// Whether to request a streaming response.
   final bool stream;
@@ -80,14 +73,12 @@ class OpenRouterProvider implements TranslationProvider {
     required this.apiKey,
     Dio? dio,
     this.endpointUrl = _kDefaultEndpoint,
-    this.bodyTemplate = _kDefaultBodyTemplate,
     this.headers = _kDefaultHeaders,
     this.streamingResponsePath = 'choices.0.delta.content',
-    this.nonStreamingResponsePath = 'choices.0.message.content',
     this.stream = true,
     this.model,
     this.visionModel,
-  }) : _dio = dio ?? Dio();
+  }) : _dio = dio ?? createTranslationDio();
 
   /// Creates an [OpenRouterProvider] from a [ProviderProfile] and API key.
   ///
@@ -123,16 +114,28 @@ class OpenRouterProvider implements TranslationProvider {
       );
       final data = response.data as Map<String, dynamic>;
       final models = data['data'] as List<dynamic>;
-      return models.map((m) => (m as Map<String, dynamic>)['id'] as String).toList();
+      return models
+          .map((m) => (m as Map<String, dynamic>)['id'] as String)
+          .toList();
     } on DioException catch (e) {
-      throw TranslationException(e.message ?? 'Failed to fetch models', statusCode: e.response?.statusCode);
+      throw TranslationException(
+        e.message ?? 'Failed to fetch models',
+        statusCode: e.response?.statusCode,
+      );
     } catch (e) {
       throw TranslationException('Unexpected error fetching models: $e');
     }
   }
 
   @override
-  Stream<String> translate(TranslationRequest request) async* {
+  Stream<String> translate(
+    TranslationRequest request, {
+    CancelToken? cancelToken,
+  }) async* {
+    if (request.inputText.trim().isEmpty &&
+        (request.imageBase64 == null || request.imageBase64!.isEmpty)) {
+      throw const TranslationException('Empty input: nothing to translate.');
+    }
     final variableMap = VariableSubstitutor.buildVariableMap(request, apiKey);
     // Override model with the provider's configured model if set.
     if (model != null) {
@@ -154,12 +157,7 @@ class OpenRouterProvider implements TranslationProvider {
     if (request.imageBase64 != null && request.imageBase64!.isNotEmpty) {
       bodyJson = _buildVisionBody(request);
     } else {
-      final substitutedBody = VariableSubstitutor.substituteMap(
-        bodyTemplate,
-        variableMap,
-        substituteTargetLanguage: request.substituteTargetLanguage,
-      );
-      bodyJson = jsonDecode(substitutedBody) as Map<String, dynamic>;
+      bodyJson = _buildTextBody(request);
     }
 
     try {
@@ -170,6 +168,7 @@ class OpenRouterProvider implements TranslationProvider {
           headers: substitutedHeaders,
           responseType: ResponseType.stream,
         ),
+        cancelToken: cancelToken,
       );
 
       final responseBody = response.data;
@@ -179,24 +178,77 @@ class OpenRouterProvider implements TranslationProvider {
 
       final parser = SSEParser(responsePath: streamingResponsePath);
 
-      await for (final chunk in responseBody.stream.cast<List<int>>().transform(
-        utf8.decoder,
-      )) {
-        final contents = parser.parseChunk(chunk);
-        for (final content in contents) {
-          yield content;
+      try {
+        await for (final chunk in responseBody.stream.cast<List<int>>().transform(
+          utf8.decoder,
+        )) {
+          final contents = parser.parseChunk(chunk);
+          for (final content in contents) {
+            yield content;
+          }
         }
+      } on DioException catch (e) {
+        if (CancelToken.isCancel(e)) {
+          throw const TranslationCancelledException();
+        }
+        rethrow;
+      }
+
+      // Stream may end silently on cancel; surface it as a cancellation.
+      if (cancelToken?.isCancelled == true) {
+        throw const TranslationCancelledException();
       }
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const TranslationCancelledException();
+      }
+      // A 404 for an image request usually means the selected model does
+      // not support vision input — explain it instead of surfacing a raw
+      // status code.
+      if (e.response?.statusCode == 404 &&
+          request.imageBase64 != null &&
+          request.imageBase64!.isNotEmpty) {
+        throw const TranslationException(
+          'The selected model does not support image translation. '
+          'Choose a vision-capable model (or switch to a text-only '
+          'request) and try again.',
+        );
+      }
       throw TranslationException(
         e.message ?? 'HTTP request failed',
         statusCode: e.response?.statusCode,
       );
+    } on TranslationCancelledException {
+      rethrow;
     } on TranslationException {
       rethrow;
     } catch (e) {
       throw TranslationException('Unexpected error: $e');
     }
+  }
+
+  /// Builds a text-only request body with system and user message content.
+  ///
+  /// The body is assembled programmatically as a `Map` so that quotes,
+  /// newlines, and other special characters in user-supplied text are
+  /// handled by the JSON serializer instead of being interpolated into a
+  /// raw JSON template (which produced invalid JSON and threw a
+  /// [FormatException] on `jsonDecode`).
+  Map<String, dynamic> _buildTextBody(TranslationRequest request) {
+    final resolvedPrompt = VariableSubstitutor.substituteMap(
+      request.systemPrompt,
+      VariableSubstitutor.buildRawVariableMap(request, apiKey),
+      substituteTargetLanguage: request.substituteTargetLanguage,
+    );
+
+    return <String, dynamic>{
+      'model': model ?? request.model,
+      'messages': [
+        {'role': 'system', 'content': resolvedPrompt},
+        {'role': 'user', 'content': request.inputText},
+      ],
+      'stream': stream,
+    };
   }
 
   /// Builds a vision-compatible request body with multimodal content blocks.
@@ -212,7 +264,7 @@ class OpenRouterProvider implements TranslationProvider {
       substituteTargetLanguage: request.substituteTargetLanguage,
     );
 
-    return {
+    return <String, dynamic>{
       'model': effectiveModel,
       'messages': [
         {'role': 'system', 'content': resolvedPrompt},

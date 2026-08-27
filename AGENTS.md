@@ -25,20 +25,24 @@ cd translation_app && flutter build apk --release
 ## Version policy
 
 The single source of truth for the version is `translation_app/pubspec.yaml`,
-field `version: <semver>+<build>` (example: `0.1.5+2005`).
+field `version: <semver>+<build>` (example: `0.1.7+2014`).
 
 Rules for maintainers:
 
 1. Every commit that lands on `main` MUST increment the numeric build
-   component (after the `+`) by exactly `1`. The semver prefix is only
-   changed by the maintainer when starting a release cycle (`0.1.6`, `1.0.0`…).
+   component (after the `+`) by exactly `1`. The semver patch is only
+   changed when starting a release cycle (`0.2.0`, `1.0.0`…).
 2. Always read the current value from `pubspec.yaml` before incrementing —
    never infer it from git log or CI run numbers. Build numbers are
    immutable once shipped.
-3. Releases are built automatically by `.github/workflows/release.yml` on
-   push to `main`: a signed APK is published as a GitHub Release named
-   `jusoor` with the asset `jusoor.apk`. The release tag is synthesised
-   from the commit SHA (`build-<sha>`).
+3. The build number doubles as the Android `versionCode`. With
+   `--split-per-abi` the final versionCode is `abiCode*1000 + build`
+   (`arm64`=2, `x86_64`=4, `armeabi-v7a`=1), so bumping the build by `1`
+   always produces a higher artifact than any previously shipped one.
+4. Releases are built automatically by `.github/workflows/release.yml` on
+   push to `main` or a tag `v*`. Semver-tag pushes produce a non-prerelease
+   GitHub Release (the update checker reads this); main-push builds create
+   prerelease entries tagged `build-<sha>`.
 
 Quick bump helper:
 

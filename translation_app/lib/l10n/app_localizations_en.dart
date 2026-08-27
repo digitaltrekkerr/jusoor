@@ -78,6 +78,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTranslateButton => 'Translate';
 
   @override
+  String get historyAutoDetected => 'Auto-detected';
+
+  @override
   String get homeClearButton => 'Clear';
 
   @override
@@ -116,6 +119,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeErrorFileBytes => 'Could not read file bytes.';
+
+  @override
+  String get shareFileTooLarge =>
+      'This file is too large to open (over 50 MB). Pick a smaller file.';
 
   @override
   String get homeFileWillBeChunked => 'File will be translated in chunks';
@@ -240,6 +247,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsArticlesSubtitle => 'Quick guides & how-it-works';
+
+  @override
+  String get settingsTips => 'Tips';
+
+  @override
+  String get settingsTipsSubtitle => 'Quick tips & step-by-step guides';
+
+  @override
+  String get tipsQuickTipsHeader => 'Quick tips';
+
+  @override
+  String get tipsUsageHeader => 'How to use the app';
+
+  @override
+  String get tipsSetupHeader => 'Step-by-step setup';
 
   @override
   String get articleLoadError => 'Could not load the article.';
@@ -486,6 +508,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get tplOutLangFixedTitle => 'Fixed output language (no variable)';
+
+  @override
+  String get tplOutLangFixedSubtitle =>
+      'This template works without a target language variable — the language selector will be hidden in the home screen, and it won\'t be assignable to the overlay.';
+
+  @override
   String get tplEditSaveButton => 'Save';
 
   @override
@@ -523,4 +552,306 @@ class AppLocalizationsEn extends AppLocalizations {
   String updateAvailableSubtitle(String version) {
     return 'Version $version is available.';
   }
+
+  @override
+  String get copyAsPlain => 'Copy as plain text';
+
+  @override
+  String get copyAsMarkdown => 'Copy as Markdown';
+
+  @override
+  String get shareAsPlain => 'Share as plain text';
+
+  @override
+  String get shareAsMarkdown => 'Share as Markdown';
+
+  @override
+  String get saveToFile => 'Save to file';
+
+  @override
+  String get copyOptionsTitle => 'Copy options';
+
+  @override
+  String get shareOptionsTitle => 'Share options';
+
+  @override
+  String get sheetPlainSubtitle => 'Without Markdown formatting';
+
+  @override
+  String get sheetMarkdownFileSubtitle => 'Text file with original formatting';
+
+  @override
+  String get sheetCopyMarkdownSubtitle => 'With original formatting';
+
+  @override
+  String get sheetSaveToFileSubtitle =>
+      'Pick the destination from the share sheet';
+
+  @override
+  String get commonName => 'Name';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get commonEdit => 'Edit';
+
+  @override
+  String get commonSave => 'Save';
+
+  @override
+  String get badgeBuiltIn => 'Built-in';
+
+  @override
+  String get badgeText => 'Text';
+
+  @override
+  String get badgeImage => 'Image';
+
+  @override
+  String get apiKeysTitle => 'API Keys';
+
+  @override
+  String get apiKeysAddTooltip => 'Add API Key';
+
+  @override
+  String get apiKeysEmptyState => 'No API keys yet. Tap + to add one.';
+
+  @override
+  String get apiKeysAddNewButton => 'Add new key';
+
+  @override
+  String get apiKeysAddTitle => 'Add API Key';
+
+  @override
+  String get apiKeysEditTitle => 'Edit API Key';
+
+  @override
+  String get apiKeysNameHint => 'e.g. OpenRouter, Gemini';
+
+  @override
+  String get apiKeysNameRequired => 'Name is required';
+
+  @override
+  String get apiKeysValueLabel => 'API Key Value';
+
+  @override
+  String get apiKeysValueRequired => 'API key value is required';
+
+  @override
+  String apiKeysSaveFailed(String error) {
+    return 'Failed to save API key: $error';
+  }
+
+  @override
+  String get apiKeysDeleteTitle => 'Delete API Key?';
+
+  @override
+  String apiKeysDeleteBody(String name) {
+    return 'Are you sure you want to delete \"$name\"? This cannot be undone.\n\nProfiles using this key will have their API key reference removed.';
+  }
+
+  @override
+  String get apiKeysEmptyValue => '(empty)';
+
+  @override
+  String get historySearchHint => 'Search translations...';
+
+  @override
+  String get historyClearAllTooltip => 'Clear all history';
+
+  @override
+  String get historyDeletedSnackbar => 'Translation deleted';
+
+  @override
+  String get historyUndoAction => 'UNDO';
+
+  @override
+  String get historyClearAllTitle => 'Clear All History';
+
+  @override
+  String get historyClearAllBody =>
+      'This will permanently delete all translation history. This action cannot be undone.';
+
+  @override
+  String get historyClearAllButton => 'Clear All';
+
+  @override
+  String historyNoResults(String query) {
+    return 'No results for \'$query\'';
+  }
+
+  @override
+  String get historyEmptyState => 'No translation history yet';
+
+  @override
+  String get historyLoadFailed => 'Failed to load history';
+
+  @override
+  String get historyToday => 'Today';
+
+  @override
+  String get historyYesterday => 'Yesterday';
+
+  @override
+  String historyDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyDetailTitle => 'Translation Details';
+
+  @override
+  String get historyInputLabel => 'Input';
+
+  @override
+  String get historyOutputLabel => 'Output';
+
+  @override
+  String get templatesAddTooltip => 'Add Template';
+
+  @override
+  String get templatesEmptyState => 'No templates yet. Tap + to add one.';
+
+  @override
+  String get templatesUnknownProfile => 'Unknown Profile';
+
+  @override
+  String get templatesDeleteTitle => 'Delete Template?';
+
+  @override
+  String templatesDeleteBody(String name) {
+    return 'Are you sure you want to delete \"$name\"? This cannot be undone.';
+  }
+
+  @override
+  String get templatesBuiltInWarning =>
+      'This is a built-in template. You can restore it by going to Settings and tapping \"Restore Built-in Items\".';
+
+  @override
+  String get profilesAddTooltip => 'Add Profile';
+
+  @override
+  String get profilesEmptyState => 'No profiles yet. Tap + to add one.';
+
+  @override
+  String get profilesDeleteTitle => 'Delete Profile?';
+
+  @override
+  String profilesDeleteBody(String name) {
+    return 'Are you sure you want to delete \"$name\"? This cannot be undone.';
+  }
+
+  @override
+  String get profilesBuiltInWarning =>
+      'This is a built-in profile. You can restore it by going to Settings and tapping \"Restore Built-in Items\".';
+
+  @override
+  String profilesModelLabel(String model) {
+    return 'Model: $model';
+  }
+
+  @override
+  String profilesApiKeyLabel(String name) {
+    return 'API Key: $name';
+  }
+
+  @override
+  String get profileEditTitle => 'Edit Profile';
+
+  @override
+  String get profileNewTitle => 'New Profile';
+
+  @override
+  String get profileNameHint => 'e.g. My OpenRouter Profile';
+
+  @override
+  String get profileProviderTypeLabel => 'Provider Type';
+
+  @override
+  String get profileModelLabel => 'Model';
+
+  @override
+  String get profileVisionModelLabel => 'Vision Model (optional)';
+
+  @override
+  String get profileSelectModelHint => 'Select a model';
+
+  @override
+  String get profileSelectApiKeyFirstHint => 'Select API key first';
+
+  @override
+  String get profileVisionModelPlaceholder => 'For image translation';
+
+  @override
+  String get profileApiKeyLabel => 'API Key';
+
+  @override
+  String get profileFallbackApiKeyLabel => 'Fallback API Key (optional)';
+
+  @override
+  String get profileSelectModelTitle => 'Select Model';
+
+  @override
+  String get profileSelectVisionModelTitle => 'Select Vision Model';
+
+  @override
+  String get profileSelectApiKeyTitle => 'Select API Key';
+
+  @override
+  String get profileSelectFallbackApiKeyTitle => 'Select Fallback API Key';
+
+  @override
+  String get profileSearchModelsHint => 'Search models...';
+
+  @override
+  String get profileRefreshModelsTooltip => 'Refresh models';
+
+  @override
+  String profileLoadModelsFailed(String error) {
+    return 'Failed to load models: $error';
+  }
+
+  @override
+  String get profileNameRequired => 'Profile name is required.';
+
+  @override
+  String get profileModelRequired => 'Model selection is required.';
+
+  @override
+  String get profileBaseUrlInvalid =>
+      'Enter a valid URL with http:// or https:// scheme.';
+
+  @override
+  String get profileBaseUrlHttpsRequired =>
+      'Insecure HTTP URLs are not allowed for remote endpoints. Use https:// (http is only permitted for localhost/127.0.0.1).';
+
+  @override
+  String get profileBaseUrlHttpsHint =>
+      'Enter a valid URL starting with https:// (or http://localhost for local models).';
+
+  @override
+  String get profileOpenAiSettingsTitle => 'OpenAI-Compatible Settings';
+
+  @override
+  String get profileBaseUrlLabel => 'Base URL';
+
+  @override
+  String get profileModelAccessTitle => 'An API key is required first';
+
+  @override
+  String get profileModelAccessBody =>
+      'Pick an existing key from your list, or add a new one to start fetching models.';
+
+  @override
+  String get profileModelAccessPickExisting => 'Pick an existing key';
+
+  @override
+  String get profileModelAccessAddNew => 'Add a new key';
 }

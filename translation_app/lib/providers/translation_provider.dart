@@ -1,10 +1,50 @@
+// Copyright (c) 2026 Jusoor. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file in the root of the source tree.
+
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:history/history.dart';
 import 'package:translation_core/translation_core.dart';
 
+import 'history_provider.dart';
 import 'settings_provider.dart';
+
+// ── Template-driven request builder ──────────────────────────────────
+
+/// Builds the effective [TranslationRequest] that is sent to the provider
+/// for a translation requested under [template].
+///
+/// [model], [systemPrompt], [profileId], and [substituteTargetLanguage]
+/// override the template/profile defaults when provided (used by the
+/// fallback-profile path).
+TranslationRequest buildTemplateRequest({
+  required String inputText,
+  required String targetLanguage,
+  required PromptTemplate template,
+  required ProviderProfile profile,
+  String? imageBase64,
+  String? imageMimeType,
+  int wordCount = 0,
+  String? model,
+  String? systemPrompt,
+  String? profileId,
+  bool? substituteTargetLanguage,
+}) {
+  return TranslationRequest(
+    inputText: inputText,
+    targetLanguage: targetLanguage,
+    imageBase64: imageBase64,
+    imageMimeType: imageMimeType,
+    wordCount: wordCount,
+    model: model ?? profile.model,
+    systemPrompt: systemPrompt ?? template.systemPrompt,
+    profileId: profileId ?? profile.id,
+    substituteTargetLanguage:
+        substituteTargetLanguage ?? template.substituteTargetLanguage,
+  );
+}
 
 // ── Translation State ────────────────────────────────────────────────
 
@@ -73,6 +113,11 @@ final translationProvider =
 class TranslationNotifier extends Notifier<TranslationState> {
   bool _isCancelled = false;
 
+  /// Aborts the in-flight HTTP request when cancelled. Created fresh for
+  /// every [translate] cycle so a cancelled token never leaks into the next
+  /// request.
+  CancelToken? _cancelToken;
+
   @override
   TranslationState build() => const TranslationIdle();
 
@@ -87,12 +132,13 @@ class TranslationNotifier extends Notifier<TranslationState> {
   /// a single retry is attempted using the fallback profile.
   Future<void> translate(TranslationRequest request) async {
     _isCancelled = false;
+    _cancelToken = CancelToken();
     state = const TranslationLoading();
 
     final stopwatch = Stopwatch()..start();
 
     // Capture the resolved system prompt before the try block so it is
-    // available in catch clauses for fallback.  It gets overwritten once
+    // available in catch clauses for fallback. It gets overwritten once
     // the template is resolved inside try.
     var resolvedSystemPrompt = request.systemPrompt;
 
@@ -118,8 +164,8 @@ class TranslationNotifier extends Notifier<TranslationState> {
         );
       }
 
-      // Capture the template's system prompt so the fallback uses it even
-      // if the user changes templates mid-translation.
+      // Capture the template's system prompt so the fallback uses it
+      // even if the user changes templates mid-translation.
       resolvedSystemPrompt = template.systemPrompt;
 
       // ── Resolve profile ─────────────────────────────────────────────
@@ -149,16 +195,15 @@ class TranslationNotifier extends Notifier<TranslationState> {
         apiKeyValue: apiKeyValue,
       );
 
-      final effectiveRequest = TranslationRequest(
+      final effectiveRequest = buildTemplateRequest(
         inputText: request.inputText,
         targetLanguage: request.targetLanguage,
         imageBase64: request.imageBase64,
         imageMimeType: request.imageMimeType,
         wordCount: request.wordCount,
-        model: profile.model,
+        template: template,
+        profile: profile,
         systemPrompt: resolvedSystemPrompt,
-        profileId: profile.id,
-        substituteTargetLanguage: template.substituteTargetLanguage,
       );
 
       // ── Stream translation ──────────────────────────────────────────
@@ -167,6 +212,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
         request: effectiveRequest,
         stopwatch: stopwatch,
       );
+    } on TranslationCancelledException {
+      // User pressed cancel — never retry via fallback, never show an error.
+      _cancelToken = null;
+      state = const TranslationIdle();
     } on TranslationException catch (e) {
       // ── Attempt fallback if configured ───────────────────────────────
       final retried = await _tryFallback(
@@ -207,8 +256,13 @@ class TranslationNotifier extends Notifier<TranslationState> {
   }
 
   /// Cancels the in-progress translation if any.
+  ///
+  /// Aborts the underlying HTTP request immediately; the provider surfaces
+  /// a [TranslationCancelledException], which [translate] maps to
+  /// [TranslationIdle] without touching the fallback chain.
   void cancel() {
     _isCancelled = true;
+    _cancelToken?.cancel();
   }
 
   // ── Private helpers ──────────────────────────────────────────────────
@@ -268,7 +322,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
       });
     }
 
-    await for (final chunk in provider.translate(request)) {
+    await for (final chunk in provider.translate(
+      request,
+      cancelToken: _cancelToken,
+    )) {
       if (_isCancelled) {
         cancelFlushTimer();
         state = const TranslationIdle();
@@ -365,6 +422,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
         stopwatch: stopwatch,
       );
       return true;
+    } on TranslationCancelledException {
+      // User cancelled during the fallback — go idle, do not report error.
+      state = const TranslationIdle();
+      return true;
     } on TranslationException {
       // Retry failed — report the original error, not the retry error.
       state = TranslationError(originalError);
@@ -379,13 +440,19 @@ class TranslationNotifier extends Notifier<TranslationState> {
   }
 
   /// Persists a completed translation to the history database.
+  ///
+  /// Goes through [historyServiceProvider] (injectable in tests) and then
+  /// refreshes [historyListProvider] so the History tab shows the new entry
+  /// immediately. Without this refresh the list stays stale until the app is
+  /// restarted, because the History tab lives in an [IndexedStack] and never
+  /// re-fetches on its own.
   Future<void> _saveToHistory({
     required TranslationRequest request,
     required String fullText,
     required String modelUsed,
     required int durationMs,
   }) async {
-    final historyService = HistoryService();
+    final historyService = ref.read(historyServiceProvider);
     await historyService.save(
       inputText: request.inputText,
       outputText: fullText,
@@ -395,5 +462,6 @@ class TranslationNotifier extends Notifier<TranslationState> {
       modelUsed: modelUsed,
       wordCount: request.wordCount,
     );
+    await ref.read(historyListProvider.notifier).refresh();
   }
 }

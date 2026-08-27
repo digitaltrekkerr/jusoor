@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -552,10 +555,31 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 
   /// Updates the theme mode in memory and persists it.
+  ///
+  /// Also notifies the floating overlay window over the overlay IPC channel
+  /// so it recolors immediately. The overlay runs in a separate Flutter
+  /// engine/isolate where Riverpod state is NOT shared, so this push is the
+  /// live-update path; it is best-effort — the overlay additionally re-reads
+  /// the persisted pref on window (re)show and on a light poll timer, so
+  /// even a missed push converges within seconds. Never throws: a routing
+  /// failure must not break theme switching.
   Future<void> set(ThemeMode mode) async {
     state = mode;
     final repo = ref.read(settingsRepositoryProvider);
     await repo.setThemeMode(mode);
+    try {
+      unawaited(
+        FlutterOverlayWindow.shareData({
+          'type': 'theme_changed',
+          'themeMode': mode.name,
+        }).catchError((Object e) {
+          debugPrint('[ThemeMode] Failed to notify overlay: $e');
+          return null;
+        }),
+      );
+    } catch (e) {
+      debugPrint('[ThemeMode] Failed to notify overlay: $e');
+    }
   }
 }
 

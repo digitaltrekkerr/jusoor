@@ -131,6 +131,54 @@ void main() {
       expect(info.apkUrl, apkUrl);
     });
 
+    test('split-per-abi assets pick the device ABI variant', () {
+      const arm64Url =
+          'https://github.com/digitaltrekkerr/jusoor/releases/download/v0.1.6/jusoor-arm64-v8a.apk';
+      const x64Url =
+          'https://github.com/digitaltrekkerr/jusoor/releases/download/v0.1.6/jusoor-x86_64.apk';
+      final info = UpdateCheckerService.evaluateUpdate(
+        currentVersion: '0.1.5',
+        preferredAbi: 'arm64-v8a',
+        releasePayload: {
+          'tag_name': '0.1.6',
+          'html_url': 'https://example.com/release/1',
+          'assets': [
+            {
+              'name': 'jusoor-armeabi-v7a.apk',
+              'browser_download_url':
+                  'https://github.com/digitaltrekkerr/jusoor/releases/download/v0.1.6/jusoor-armeabi-v7a.apk',
+            },
+            {'name': 'jusoor-arm64-v8a.apk', 'browser_download_url': arm64Url},
+            {'name': 'jusoor-x86_64.apk', 'browser_download_url': x64Url},
+          ],
+        },
+      );
+      expect(info.hasUpdate, isTrue);
+      expect(info.apkUrl, arm64Url);
+    });
+
+    test('unknown ABI falls back to the first apk asset', () {
+      const firstUrl =
+          'https://github.com/digitaltrekkerr/jusoor/releases/download/v0.1.6/jusoor-armeabi-v7a.apk';
+      final info = UpdateCheckerService.evaluateUpdate(
+        currentVersion: '0.1.5',
+        preferredAbi: 'unusual-abi',
+        releasePayload: {
+          'tag_name': '0.1.6',
+          'html_url': 'https://example.com/release/1',
+          'assets': [
+            {'name': 'jusoor-armeabi-v7a.apk', 'browser_download_url': firstUrl},
+            {
+              'name': 'jusoor-arm64-v8a.apk',
+              'browser_download_url':
+                  'https://github.com/digitaltrekkerr/jusoor/releases/download/v0.1.6/jusoor-arm64-v8a.apk',
+            },
+          ],
+        },
+      );
+      expect(info.apkUrl, firstUrl);
+    });
+
     test('patch-level comparison works on equal minor versions', () {
       final info = UpdateCheckerService.evaluateUpdate(
         currentVersion: '0.1.10',
