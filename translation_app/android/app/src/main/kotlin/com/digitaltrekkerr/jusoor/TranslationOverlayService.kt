@@ -167,6 +167,17 @@ class TranslationOverlayService :
     private var isHidden = false
     private var hasWindowFocus = true
     private var isFocusable = false
+
+    /**
+     * Tracks whether the soft keyboard is currently on screen. Toggled
+     * in `updateFlags` whenever we ask Android to show or hide the
+     * IME, so the BACK key handler in `setOnKeyListener` has a
+     * reliable signal for "is there actually a keyboard up to
+     * dismiss?". (`InputMethodManager.isAcceptingText` returns true
+     * for the overlay window any time it has focus, even with no
+     * keyboard on screen, which made BACK silently swallow itself.)
+     */
+    private var isImeShown = false
     private var systemDialogReceiver: BroadcastReceiver? = null
     private var stopServiceReceiver: BroadcastReceiver? = null
     private var projectionResultReceiver: BroadcastReceiver? = null
@@ -182,6 +193,7 @@ class TranslationOverlayService :
     private var isReadingClipboard = false
     private var pendingClipboardResult: MethodChannel.Result? = null
     private var clipboardResultReceiver: BroadcastReceiver? = null
+    private var isShareInProgress = false
     private var captureThread: HandlerThread? = null
     private var captureHandler: Handler? = null
 
@@ -189,16 +201,20 @@ class TranslationOverlayService :
         ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
             Log.d(
                 TAG,
-                "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard",
+                "Window focus changed: hasFocus=$hasFocus, isHidden=$isHidden, isRequestingMediaProjection=$isRequestingMediaProjection, isScreenshotInProgress=$isScreenshotInProgress, isReadingClipboard=$isReadingClipboard, isShareInProgress=$isShareInProgress",
             )
             if (!hasFocus && !isHidden && hasWindowFocus && !isRequestingMediaProjection && !isScreenshotInProgress &&
-                !isReadingClipboard
+                !isReadingClipboard && !isShareInProgress
             ) {
                 Log.d(TAG, "Lost focus while not hidden - closing overlay")
                 hasWindowFocus = false
                 closeOverlay()
             } else if (hasFocus) {
                 hasWindowFocus = true
+                // The system share sheet (or any external window) just
+                // released focus back to us; a pending share flag is no
+                // longer needed and would otherwise leak forever.
+                isShareInProgress = false
             }
         }
 
@@ -899,6 +915,17 @@ class TranslationOverlayService :
                     result.success(true)
                 }
 
+                "setShareInProgress" -> {
+                    // Raised by the overlay engine right before it opens the
+                    // system share sheet (share_plus). Opening an external
+                    // window steals focus from the overlay; without this flag
+                    // the windowFocusListener would treat that as a user
+                    // dismissal and close the overlay. Cleared when focus
+                    // returns or when the overlay is closed.
+                    isShareInProgress = call.argument<Boolean>("active") ?: false
+                    result.success(true)
+                }
+
                 "readClipboard" -> {
                     if (pendingClipboardResult != null) {
                         Log.w(TAG, "Previous clipboard read still pending, rejecting")
@@ -1009,10 +1036,30 @@ class TranslationOverlayService :
 
         flutterView?.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event.action == KeyEvent.ACTION_DOWN) {
-                    Log.d(TAG, "Back button pressed (DOWN) while focusable - closing overlay")
+                // Standard Android BACK behavior: try to close the soft
+                // keyboard first; the overlay is only closed if there
+                // is nothing else to consume the event. We do this on
+                // ACTION_UP so a single back press always closes the
+                // overlay; if the IME was visible the user will see it
+                // animate away and the next back press will close the
+                // overlay. (A previous version used ACTION_DOWN with
+                // `imm.isAcceptingText` -- that returned `true` for the
+                // overlay window even when no keyboard was on screen,
+                // which meant back never closed the overlay after a
+                // translation completed.)
+                if (event.action == KeyEvent.ACTION_UP) {
+                    val imm = applicationContext
+                        .getSystemService(Context.INPUT_METHOD_SERVICE)
+                        as? android.view.inputmethod.InputMethodManager
+                    val token = flutterView?.windowToken
+                    if (imm != null && token != null) {
+                        if (isImeShown) {
+                            isImeShown = false
+                            imm.hideSoftInputFromWindow(token, 0)
+                            return@setOnKeyListener true
+                        }
+                    }
                     closeOverlay()
-                    return@setOnKeyListener true
                 }
                 return@setOnKeyListener true
             }
@@ -1052,14 +1099,26 @@ class TranslationOverlayService :
                     @Suppress("DEPRECATION")
                     WindowManager.LayoutParams.TYPE_PHONE
                 },
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                // Keep the overlay window focusable at the WindowManager
+                // level so the hardware BACK key is routed to the
+                // flutterView's `setOnKeyListener`. The keyboard is
+                // controlled separately via `softInputMode` (see
+                // `updateFlags`); toggling `FLAG_NOT_FOCUSABLE` from
+                // Dart would also remove BACK delivery and break
+                // "back closes the overlay" the moment the user stops
+                // typing.
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT,
             )
         params.gravity = Gravity.TOP
+        // Default: never pop the soft keyboard on its own. The user
+        // (or `updateFlags(true)`) has to opt in.
+        params.softInputMode =
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
 
         scrimView =
             View(this).apply {
@@ -1118,16 +1177,30 @@ class TranslationOverlayService :
     private fun updateFlags(focusable: Boolean) {
         try {
             val currentParams = flutterView?.layoutParams as? WindowManager.LayoutParams ?: return
-            val newFlags =
+            // The overlay window is always focusable at the
+            // WindowManager level now (so the hardware back key keeps
+            // reaching the flutterView). The "focusable" flag from
+            // Dart is reinterpreted as "should the soft keyboard be
+            // visible" and we express that via `softInputMode` only.
+            val newSoftInputMode =
                 if (focusable) {
-                    currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                        WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
                 } else {
-                    currentParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                        WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
                 }
-            currentParams.flags = newFlags
-            windowManager?.updateViewLayout(flutterView, currentParams)
+            if (currentParams.softInputMode == newSoftInputMode && isFocusable == focusable) {
+                return
+            }
+            currentParams.softInputMode = newSoftInputMode
             isFocusable = focusable
-            Log.d(TAG, "Updated focusable: $focusable")
+            isImeShown = focusable
+            windowManager?.updateViewLayout(flutterView, currentParams)
+            Log.d(
+                TAG,
+                "Updated focusable: $focusable (softInputMode=0x${newSoftInputMode.toString(16)})",
+            )
 
             if (focusable) {
                 flutterView?.requestFocus()
@@ -1144,6 +1217,7 @@ class TranslationOverlayService :
         isHidden = false
         hasWindowFocus = true
         isFocusable = false
+        isShareInProgress = false
         try {
             scrimView?.let {
                 windowManager?.removeViewImmediate(it)

@@ -159,14 +159,34 @@ class _OverlayAppState extends State<_OverlayApp> with WidgetsBindingObserver {
       themeMode: _themeMode,
       child: PopScope(
         canPop: false,
+        // Two distinct events are routed through this callback and we
+        // must not conflate them:
+        //
+        // 1. The system back key is pressed while the overlay is at
+        //    the root (no modal route, sheet or selection toolbar is
+        //    on top). In that case Flutter dispatches a pop to the
+        //    root, which we have marked as `canPop: false`, so the
+        //    attempt is intercepted and `didPop` is `false`. That is
+        //    a genuine "user wants to leave the overlay" gesture and
+        //    we honour it by closing the overlay.
+        //
+        // 2. A child route (e.g. the selection toolbar that appears
+        //    when the user long-presses the translation result) is
+        //    popped — either by its own dismissal logic or by the
+        //    user pressing back on the toolbar. Because the pop
+        //    target is a descendant of the root and we only blocked
+        //    the root, the pop succeeds and `didPop` is `true`. We
+        //    must NOT close the overlay in that case or even simple
+        //    text-selection would kill the window.
         onPopInvokedWithResult: (didPop, result) async {
-          if (!didPop) {
-            try {
-              await _overlayChannel.invokeMethod('close');
-            } catch (e) {
-              if (kDebugMode) {
-                debugPrint('[Overlay] Close error: $e');
-              }
+          if (didPop) {
+            return;
+          }
+          try {
+            await _overlayChannel.invokeMethod('close');
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('[Overlay] Close error: $e');
             }
           }
         },
@@ -262,12 +282,19 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
     _inputController.addListener(_onInputChanged);
 
     _inputFocusNode.addListener(() async {
+      // Only ever turn focusability ON here. Turning it OFF when the
+      // TextField loses focus (e.g. after tapping Translate/Share, or
+      // the translated text box) makes the overlay window
+      // FLAG_NOT_FOCUSABLE, which means it can no longer receive ANY
+      // key events - including the hardware/system back button. That
+      // silently breaks "back closes the overlay" any time text was
+      // entered. The panel is already modal (scrim + outside-tap
+      // dismiss), so it should stay focusable for as long as it's
+      // visible; only the minimize/hide path (isHidden on the native
+      // side) should ever turn focusability off.
+      if (!_inputFocusNode.hasFocus) return;
       try {
-        if (_inputFocusNode.hasFocus) {
-          await _overlayChannel.invokeMethod('focusable', {'enable': true});
-        } else {
-          await _overlayChannel.invokeMethod('focusable', {'enable': false});
-        }
+        await _overlayChannel.invokeMethod('focusable', {'enable': true});
       } catch (e) {
         if (kDebugMode) {
           debugPrint('[Overlay] Focus update error: $e');
@@ -587,6 +614,36 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
     });
   }
 
+  /// before opening the system share sheet; opening one while the IME is
+  /// visible causes Android to emit a synthetic BACK to close the keyboard
+  /// and the overlay window's onKeyListener would otherwise kill the
+  /// overlay as a side effect.
+  void _dismissIme() {
+    try {
+      final focus = FocusManager.instance.primaryFocus;
+      if (focus != null) {
+        focus.unfocus();
+      }
+    } catch (_) {}
+  }
+
+  /// Marks the overlay service as "sharing" so the native side does not
+  /// treat the focus loss caused by the system share sheet as a user
+  /// dismissal. The flag is raised before opening the sheet and lowered
+  /// when focus returns (native side) or when the sheet is done.
+  Future<void> _setShareInProgress(bool active) async {
+    try {
+      await _overlayChannel.invokeMethod(
+        'setShareInProgress',
+        {'active': active},
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Overlay] setShareInProgress failed: $e');
+      }
+    }
+  }
+
   Future<void> _shareText(String text, {String mode = 'plain'}) async {
     try {
       if (mode == 'saveFile') {
@@ -594,7 +651,17 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
         return;
       }
       final processed = mode == 'markdown' ? text : toPlainText(text);
-      await SharePlus.instance.share(ShareParams(text: processed));
+      // Hide the IME before invoking the system share sheet so Android
+      // does not synthesise a BACK key while the window is focusable.
+      _dismissIme();
+      // Opening the Android share sheet steals window focus from the
+      // overlay; tell the service not to interpret that as a close.
+      await _setShareInProgress(true);
+      try {
+        await SharePlus.instance.share(ShareParams(text: processed));
+      } finally {
+        await _setShareInProgress(false);
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[Overlay] Share error: $e');
@@ -611,15 +678,23 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final file = File('${tempDir.path}/jusoor_translation_$timestamp.md');
+      // Hide the IME before opening the share sheet for save-to-file as
+      // well, for the same reason as the plain/markdown path above.
+      _dismissIme();
       try {
         await file.writeAsString(text);
-        await SharePlus.instance.share(
-          ShareParams(
-            text: 'Jusoor translation',
-            subject: 'Jusoor translation',
-            files: [XFile(file.path)],
-          ),
-        );
+        await _setShareInProgress(true);
+        try {
+          await SharePlus.instance.share(
+            ShareParams(
+              text: 'Jusoor translation',
+              subject: 'Jusoor translation',
+              files: [XFile(file.path)],
+            ),
+          );
+        } finally {
+          await _setShareInProgress(false);
+        }
       } finally {
         // Deferred cleanup: the share target may still be reading this
         // file after the sheet closes — deleting here races it.
@@ -666,6 +741,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
   Future<void> _showShareOptions(String text) async {
     final l10n = await _overlayL10n();
     if (!mounted) return;
+    // Dismiss the soft keyboard before pushing the modal route so the
+    // OS does not synthesize a BACK event as it closes the IME.
+    _dismissIme();
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
