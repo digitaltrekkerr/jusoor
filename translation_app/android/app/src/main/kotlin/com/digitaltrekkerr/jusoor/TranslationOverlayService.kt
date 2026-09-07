@@ -426,6 +426,22 @@ class TranslationOverlayService :
         }
     }
 
+    /**
+     * Starts the foreground service as [ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE]
+     * only.
+     *
+     * CRITICAL (Android 14+ / API 34+): we must NOT pass
+     * FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION here. On API 34+ the system
+     * validates that a mediaProjection-type FGS can only be started after a
+     * real MediaProjection consent token exists; starting it without one (as
+     * happens on every service boot, before the user ever taps the screenshot
+     * button) throws a SecurityException and kills the whole service — which
+     * is why the Quick Settings tile "did nothing" on Android 14/15/16. The
+     * overlay window itself does not need the projection type, only the
+     * screen capture does, and that is promoted later in
+     * [promoteToMediaProjectionType] once the consent token is actually
+     * granted.
+     */
     @Suppress("DEPRECATION")
     private fun startForegroundCompat(
         notificationId: Int,
@@ -435,11 +451,36 @@ class TranslationOverlayService :
             startForeground(
                 notificationId,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
             )
         } else {
             startForeground(notificationId, notification)
+        }
+    }
+
+    /**
+     * Promotes the running foreground service to also carry the
+     * [ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION] type once a real
+     * MediaProjection consent token has been obtained.
+     *
+     * Called from [onProjectionResult] immediately after a successful
+     * `getMediaProjection(...)`. This is the only safe moment to add the
+     * mediaProjection type — the system requires the token to exist at the
+     * time the type is asserted, otherwise the same SecurityException we
+     * avoid in [startForegroundCompat] would be thrown here instead.
+     */
+    private fun promoteToMediaProjectionType() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
+            )
+            Log.d(TAG, "Foreground service promoted to include MEDIA_PROJECTION type")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to promote foreground service to mediaProjection type", e)
         }
     }
 
@@ -562,6 +603,7 @@ class TranslationOverlayService :
             )
 
             Log.i(TAG, "MediaProjection created successfully")
+            promoteToMediaProjectionType()
             performCapture()
             Toast.makeText(this, "Screen capture enabled", Toast.LENGTH_SHORT).show()
         } else {
