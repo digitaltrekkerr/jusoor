@@ -1307,6 +1307,14 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
                         ? BiDiMarkdownView(
                             markdownText: _translatedText,
                             selectable: true,
+                            // Route the selection menu's Copy/Share through
+                            // the overlay's own MethodChannel: the overlay
+                            // engine has no PlatformPlugin (no Activity), so
+                            // the framework Clipboard channel would silently
+                            // no-op; `_copyText`/`_shareText` write via the
+                            // Service-context ClipboardManager instead.
+                            onCopy: (text) => _copyText(text),
+                            onShare: (text) => _shareText(text),
                           )
                         : _isLoading
                         ? const BiDiMarkdownView.loading()

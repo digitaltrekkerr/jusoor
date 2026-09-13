@@ -7,6 +7,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -155,6 +157,14 @@ class TranslationOverlayService :
     private var overlayMessageChannel: BasicMessageChannel<Any>? = null
     private var screenshotChannel: MethodChannel? = null
 
+    /**
+     * Serves the clipboard subset of Flutter's `flutter/platform` channel for
+     * the overlay engine (see the handler in `onCreate`). Without it, the
+     * framework's own `Clipboard.setData` — used by the text-selection toolbar
+     * "Copy" action — has no handler on this engine and silently fails.
+     */
+    private var platformChannel: MethodChannel? = null
+
     private var flutterParams: WindowManager.LayoutParams? = null
     private var scrimParams: WindowManager.LayoutParams? = null
     private var navBarParams: WindowManager.LayoutParams? = null
@@ -253,6 +263,71 @@ class TranslationOverlayService :
                 when (call.method) {
                     "captureScreen" -> captureScreen(result)
                     "hasMediaProjection" -> result.success(mediaProjection != null)
+                    else -> result.notImplemented()
+                }
+            }
+
+            // The overlay engine is created from a Service (no Activity), so
+            // Flutter's own PlatformPlugin is never attached to it: the
+            // `flutter/platform` channel is unhandled and every clipboard call
+            // made by the FRAMEWORK silently no-ops (MissingPluginException).
+            // That is why "Copy" in the text-selection toolbar of the
+            // translated text did nothing while our custom `writeClipboard`
+            // method call worked. Serve the clipboard subset of that channel
+            // here, using the same application-context ClipboardManager the
+            // custom handler already relies on.
+            platformChannel = MethodChannel(engine.dartExecutor, "flutter/platform")
+            platformChannel?.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "Clipboard.setData" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        try {
+                            val clipboard =
+                                applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("translated", text))
+                            Log.d("ClipboardDebug", "platform write: ${text.length} chars")
+                            result.success(null)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to write clipboard", e)
+                            result.error("CLIPBOARD_ERROR", e.message, null)
+                        }
+                    }
+
+                    "Clipboard.getData" -> {
+                        // Best effort: on Android 10+ the system only returns
+                        // clipboard contents to a focused window or the
+                        // default IME, so a null result is expected while the
+                        // overlay is not focused.
+                        val text =
+                            try {
+                                val clipboard =
+                                    applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                if (clipboard.hasPrimaryClip()) {
+                                    clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                                } else {
+                                    null
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to read clipboard", e)
+                                null
+                            }
+                        result.success(mapOf("text" to text))
+                    }
+
+                    "Clipboard.hasStrings" -> {
+                        val hasStrings =
+                            try {
+                                val clipboard =
+                                    applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.hasPrimaryClip() &&
+                                    (clipboard.primaryClip?.itemCount ?: 0) > 0 &&
+                                    !clipboard.primaryClip?.getItemAt(0)?.text.isNullOrEmpty()
+                            } catch (e: Exception) {
+                                false
+                            }
+                        result.success(mapOf("value" to hasStrings))
+                    }
+
                     else -> result.notImplemented()
                 }
             }
@@ -832,6 +907,11 @@ class TranslationOverlayService :
         isHidden = true
         hasWindowFocus = false
         try {
+            // Force hide the soft keyboard when minimized
+            flutterView?.let {
+                val imm = applicationContext.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(it.windowToken, 0)
+            }
             scrimView?.visibility = View.INVISIBLE
             navBarSentinel?.visibility = View.INVISIBLE
             flutterView?.visibility = View.INVISIBLE
@@ -1261,6 +1341,11 @@ class TranslationOverlayService :
         isFocusable = false
         isShareInProgress = false
         try {
+            // Force hide the soft keyboard before removing views
+            flutterView?.let {
+                val imm = applicationContext.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(it.windowToken, 0)
+            }
             scrimView?.let {
                 windowManager?.removeViewImmediate(it)
             }
@@ -1275,6 +1360,7 @@ class TranslationOverlayService :
         } catch (e: Exception) {
             Log.e(TAG, "Error closing overlay", e)
         }
+
         scrimView = null
         navBarSentinel = null
         flutterView = null

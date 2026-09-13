@@ -8,23 +8,43 @@ class BiDiMarkdownView extends StatefulWidget {
   final bool isLoading;
   final bool selectable;
 
+  /// Optional callbacks used by the custom selection context menu.
+  ///
+  /// When provided, the toolbar's Copy / Share buttons route through these
+  /// instead of the framework's `Clipboard.setData`. That matters inside the
+  /// floating overlay, whose secondary Flutter engine has no `PlatformPlugin`
+  /// attached (no Activity), so the framework clipboard channel silently
+  /// no-ops there. Copying via the app's own MethodChannel (which writes with
+  /// a Service-context ClipboardManager) is the reliable path.
+  ///
+  /// Typed as `void Function(String)` so both sync (`_copyText`) and async
+  /// (`_shareText`) handlers are accepted.
+  final void Function(String text)? onCopy;
+  final void Function(String text)? onShare;
+
   const BiDiMarkdownView({
     super.key,
     required this.markdownText,
     this.isLoading = false,
     this.selectable = false,
+    this.onCopy,
+    this.onShare,
   });
 
   const BiDiMarkdownView.loading({super.key})
     : markdownText = '',
       isLoading = true,
       selectable = false,
+      onCopy = null,
+      onShare = null,
       super();
 
   const BiDiMarkdownView.streaming({
     super.key,
     required String partial,
     this.selectable = false,
+    this.onCopy,
+    this.onShare,
   }) : markdownText = partial,
        isLoading = false,
        super();
@@ -130,6 +150,11 @@ const int _maxDirectionScanRunes = 8000;
 class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
   TextDirection? _detectedDirection;
 
+  /// Latest non-empty selection reported by the [SelectionArea]. Used by the
+  /// custom toolbar's Copy/Share buttons (there is no public getter on
+  /// `SelectableRegionState` to read the current selection).
+  String? _lastSelection;
+
   @override
   void initState() {
     super.initState();
@@ -234,7 +259,47 @@ class _BiDiMarkdownViewState extends State<BiDiMarkdownView> {
       key: ValueKey('bidi-dir-$direction'),
       textDirection: direction,
       child: widget.selectable
-          ? SelectionArea(child: markdownBody)
+          ? SelectionArea(
+              // Custom toolbar: keep the buttons Flutter-drawn and route the
+              // copy through [onCopy] (overlay engine) when provided, instead
+              // of the framework Clipboard channel that has no handler on a
+              // Service-owned secondary engine.
+              contextMenuBuilder: (context, selectableRegionState) {
+                final selectedText = _lastSelection ?? '';
+                final onCopy = widget.onCopy;
+                final onShare = widget.onShare;
+                return AdaptiveTextSelectionToolbar.buttonItems(
+                  anchors: selectableRegionState.contextMenuAnchors,
+                  buttonItems: [
+                    ContextMenuButtonItem(
+                      type: ContextMenuButtonType.copy,
+                      onPressed: selectedText.isEmpty || onCopy == null
+                          ? null
+                          : () => onCopy(selectedText),
+                    ),
+                    ContextMenuButtonItem(
+                      type: ContextMenuButtonType.selectAll,
+                      onPressed: () => selectableRegionState.selectAll(
+                        SelectionChangedCause.toolbar,
+                      ),
+                    ),
+                    if (onShare != null)
+                      ContextMenuButtonItem(
+                        type: ContextMenuButtonType.share,
+                        onPressed: selectedText.isEmpty
+                            ? null
+                            : () => onShare(selectedText),
+                      ),
+                  ],
+                );
+              },
+              onSelectionChanged: (content) {
+                final text = content?.plainText;
+                if (text == null || text.isEmpty) return;
+                _lastSelection = text;
+              },
+              child: markdownBody,
+            )
           : markdownBody,
     );
   }
