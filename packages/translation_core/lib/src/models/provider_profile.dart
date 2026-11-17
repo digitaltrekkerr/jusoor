@@ -23,6 +23,25 @@ class ProviderProfile extends Equatable {
 
   final bool isBuiltIn;
 
+  /// Reasoning effort requested for this profile's models.
+  ///
+  /// Persisted as the provider wire value (`"low"`, `"medium"`, …) rather
+  /// than the Dart enum name, so a profile saved by a future version that
+  /// adds new levels still parses without a migration.
+  ///
+  /// `null` means the profile expresses no preference, which keeps requests
+  /// byte-identical to what older versions produced.
+  ///
+  /// Only honoured by [ProviderType.openrouter] profiles; other providers
+  /// ignore it and never emit a `reasoning` block.
+  final String? reasoningEffort;
+
+  /// Whether reasoning tokens are withheld from the response.
+  ///
+  /// Defaults to `true` — raw chain-of-thought would otherwise stream into
+  /// the translation overlay. The tokens are consumed and billed regardless.
+  final bool reasoningExclude;
+
   const ProviderProfile({
     required this.id,
     required this.name,
@@ -33,6 +52,8 @@ class ProviderProfile extends Equatable {
     this.visionModel,
     this.baseUrl,
     this.isBuiltIn = false,
+    this.reasoningEffort,
+    this.reasoningExclude = true,
   });
 
   factory ProviderProfile.fromJson(Map<String, dynamic> json) {
@@ -48,6 +69,8 @@ class ProviderProfile extends Equatable {
       visionModel: json['visionModel'] as String?,
       baseUrl: json['baseUrl'] as String?,
       isBuiltIn: json['isBuiltIn'] as bool? ?? false,
+      reasoningEffort: json['reasoningEffort'] as String?,
+      reasoningExclude: json['reasoningExclude'] as bool? ?? true,
     );
   }
 
@@ -62,6 +85,8 @@ class ProviderProfile extends Equatable {
       'visionModel': visionModel,
       'baseUrl': baseUrl,
       'isBuiltIn': isBuiltIn,
+      'reasoningEffort': reasoningEffort,
+      'reasoningExclude': reasoningExclude,
     };
   }
 
@@ -75,6 +100,8 @@ class ProviderProfile extends Equatable {
     String? visionModel,
     String? baseUrl,
     bool? isBuiltIn,
+    Object? reasoningEffort = _undefined,
+    bool? reasoningExclude,
   }) {
     return ProviderProfile(
       id: id ?? this.id,
@@ -90,6 +117,10 @@ class ProviderProfile extends Equatable {
       visionModel: visionModel ?? this.visionModel,
       baseUrl: baseUrl ?? this.baseUrl,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+      reasoningEffort: identical(reasoningEffort, _undefined)
+          ? this.reasoningEffort
+          : reasoningEffort as String?,
+      reasoningExclude: reasoningExclude ?? this.reasoningExclude,
     );
   }
 
@@ -104,5 +135,7 @@ class ProviderProfile extends Equatable {
     visionModel,
     baseUrl,
     isBuiltIn,
+    reasoningEffort,
+    reasoningExclude,
   ];
 }

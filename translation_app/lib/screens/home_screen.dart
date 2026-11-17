@@ -20,6 +20,7 @@ import '../services/deferred_temp_file_cleanup.dart';
 import '../services/share_intent_handler.dart';
 import '../widgets/bidi_markdown_view.dart';
 import '../widgets/language_dropdown.dart';
+import '../utils/image_payload.dart';
 
 /// Main translation screen with input, language selectors, and output.
 ///
@@ -77,6 +78,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // ── Shared content handling ──────────────────────────────────────────
 
+  /// Stores an image for translation, resizing it on the way in.
+  ///
+  /// Every image entering the app goes through here so the limits are
+  /// enforced once. OpenRouter routes image requests to the provider of
+  /// your choice, and those providers disagree sharply on what they accept:
+  /// OpenAI-style gateways silently downscale an oversized image, while
+  /// Anthropic rejects it outright — a full-screen PNG screenshot cleared
+  /// Anthropic's limit and failed with a bare HTTP 400 on a Claude model
+  /// while working fine on a GPT one.
+  ///
+  /// [ImagePayloadPreparer] caps the long edge at 1568 px, which also caps
+  /// the token cost at Anthropic's standard resolution tier.
+  Future<void> _setImage(Uint8List bytes, String? mimeType) async {
+    final prepared = await ImagePayloadPreparer.prepare(
+      bytes,
+      mimeType: mimeType,
+    );
+    if (!mounted) return;
+    setState(() {
+      _imageBytes = bytes;
+      _imageBase64 = prepared.base64;
+      _imageMimeType = prepared.mimeType;
+    });
+  }
+
   /// Processes the current shared content from [sharedContentProvider].
   Future<void> _processSharedContent() async {
     final content = ref.read(sharedContentProvider);
@@ -84,11 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _lastProcessedContent = content;
 
     if (content.hasImage) {
-      setState(() {
-        _imageBytes = content.imageBytes;
-        _imageBase64 = base64Encode(content.imageBytes!);
-        _imageMimeType = 'image/jpeg';
-      });
+      await _setImage(content.imageBytes!, 'image/jpeg');
       ref.read(sharedContentProvider.notifier).clear();
       return;
     }
@@ -119,11 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return;
       }
       if (parsed.hasImage) {
-        setState(() {
-          _imageBytes = parsed.imageBytes;
-          _imageBase64 = base64Encode(parsed.imageBytes!);
-          _imageMimeType = 'image/jpeg';
-        });
+        await _setImage(parsed.imageBytes!, 'image/jpeg');
         ref.read(sharedContentProvider.notifier).clear();
         return;
       }
@@ -242,12 +260,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final bytes = await xFile.readAsBytes();
     final extension = xFile.name.split('.').last.toLowerCase();
-    final mimeType = _mimeTypeFromExtension(extension);
-    setState(() {
-      _imageBytes = bytes;
-      _imageBase64 = base64Encode(bytes);
-      _imageMimeType = mimeType;
-    });
+    await _setImage(bytes, _mimeTypeFromExtension(extension));
   }
 
   Future<void> _handleUploadFile() async {

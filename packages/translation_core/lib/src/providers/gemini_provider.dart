@@ -8,9 +8,12 @@ import 'package:dio/dio.dart';
 
 import '../exceptions/translation_exception.dart';
 import '../exceptions/translation_cancelled_exception.dart';
+import '../models/model_capabilities.dart';
 import '../models/translation_request.dart';
 import '../models/translation_provider.dart';
 import '../utils/dio_factory.dart';
+import '../utils/dio_error_extractor.dart';
+import '../utils/image_payload_guard.dart';
 import '../utils/response_path_extractor.dart';
 import '../utils/sse_parser.dart';
 import '../utils/variable_substitutor.dart';
@@ -51,14 +54,22 @@ class GeminiProvider implements TranslationProvider {
     'x-goog-api-key': apiKey,
   };
 
+  /// Gemini does not expose per-model reasoning metadata in its model
+  /// listing, so no capabilities can be reported.
+  ///
+  /// Returning an empty list is the correct answer for this provider: effort
+  /// is an OpenRouter-only feature, so [OpenRouterProvider] is the only
+  /// implementation that ever has something to report.
+  @override
+  Future<List<ModelCapabilities>> fetchModelCapabilities() async => const [];
+
   @override
   Future<List<String>> fetchModels() async {
     try {
       final response = await _dio.get(
         _kBaseGeminiUrl,
         options: Options(headers: _headers),
-      );
-      final data = response.data as Map<String, dynamic>;
+      );      final data = response.data as Map<String, dynamic>;
       final models = data['models'] as List<dynamic>;
       return models.map((m) {
         final name = (m as Map<String, dynamic>)['name'] as String;
@@ -66,7 +77,7 @@ class GeminiProvider implements TranslationProvider {
       }).toList();
     } on DioException catch (e) {
       throw TranslationException(
-        e.message ?? 'Failed to fetch models',
+        describeDioError(e, provider: 'Gemini'),
         statusCode: e.response?.statusCode,
       );
     } catch (e) {
@@ -83,8 +94,17 @@ class GeminiProvider implements TranslationProvider {
         (request.imageBase64 == null || request.imageBase64!.isEmpty)) {
       throw const TranslationException('Empty input: nothing to translate.');
     }
-    final isVision =
-        request.imageBase64 != null && request.imageBase64!.isNotEmpty;
+
+    final imageBase64 = request.imageBase64;
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      final verdict =
+          ImagePayloadGuard.check(imageBase64, request.imageMimeType);
+      if (!verdict.isValid) {
+        throw TranslationException(verdict.problem!);
+      }
+    }
+
+    final isVision = imageBase64 != null && imageBase64.isNotEmpty;
     final effectiveModel = isVision ? (visionModel ?? model) : model;
     final bodyJson = isVision
         ? _buildVisionBody(request)
@@ -128,7 +148,7 @@ class GeminiProvider implements TranslationProvider {
         throw const TranslationCancelledException();
       }
       throw TranslationException(
-        e.message ?? 'HTTP request failed',
+        describeDioError(e, provider: 'Gemini'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -180,7 +200,7 @@ class GeminiProvider implements TranslationProvider {
         throw const TranslationCancelledException();
       }
       throw TranslationException(
-        e.message ?? 'HTTP request failed',
+        describeDioError(e, provider: 'Gemini'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -239,7 +259,8 @@ class GeminiProvider implements TranslationProvider {
             },
             {
               'inlineData': {
-                'mimeType': request.imageMimeType ?? 'image/jpeg',
+                'mimeType':
+                    ImagePayloadGuard.normalizeMimeType(request.imageMimeType),
                 'data': request.imageBase64,
               },
             },

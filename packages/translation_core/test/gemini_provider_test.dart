@@ -137,7 +137,7 @@ void main() {
           inputText: 'Describe this',
           targetLanguage: 'English',
           systemPrompt: 'You are a translator.',
-          imageBase64: 'base64imagedata==',
+          imageBase64: 'aGVsbG8=',
         );
 
         await provider.translate(request).toList();
@@ -158,7 +158,7 @@ void main() {
 
         final inlineData = userParts[1]['inlineData'] as Map<String, dynamic>;
         expect(inlineData['mimeType'], 'image/jpeg');
-        expect(inlineData['data'], 'base64imagedata==');
+        expect(inlineData['data'], 'aGVsbG8=');
       });
 
       test('vision body uses imageMimeType when provided', () async {
@@ -172,7 +172,7 @@ void main() {
           inputText: 'Describe this',
           targetLanguage: 'English',
           systemPrompt: 'You are a translator.',
-          imageBase64: 'base64imagedata==',
+          imageBase64: 'aGVsbG8=',
           imageMimeType: 'image/png',
         );
 
@@ -226,7 +226,7 @@ void main() {
             inputText: '',
             targetLanguage: 'French',
             systemPrompt: 'You are a translator.',
-            imageBase64: 'base64data==',
+            imageBase64: 'aGVsbG8=',
           );
 
           await provider.translate(request).toList();
@@ -280,7 +280,7 @@ void main() {
             inputText: 'Describe this',
             targetLanguage: 'Japanese',
             systemPrompt: 'Translate the text to {{target_language}}.',
-            imageBase64: 'base64data==',
+            imageBase64: 'aGVsbG8=',
           );
 
           await provider.translate(request).toList();
@@ -408,7 +408,7 @@ void main() {
           final request = TranslationRequest(
             inputText: 'Describe this',
             targetLanguage: 'English',
-            imageBase64: 'base64imagedata==',
+            imageBase64: 'aGVsbG8=',
           );
 
           await provider.translate(request).toList();
@@ -432,7 +432,7 @@ void main() {
           final request = TranslationRequest(
             inputText: 'Describe this',
             targetLanguage: 'English',
-            imageBase64: 'base64imagedata==',
+            imageBase64: 'aGVsbG8=',
           );
 
           await provider.translate(request).toList();

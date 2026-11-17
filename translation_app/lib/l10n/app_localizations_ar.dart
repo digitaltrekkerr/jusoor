@@ -327,7 +327,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get pagesPermissionOverlayBody =>
-      'يرسم جسور نافذة الترجمة العائمة فوق التطبيقات الأخرى. لا تُفتح إلا عند النقر على بلاطة \"ترجم\" في الإعدادات السريعة أو على زر النافذة العائمة. أثناء فتحها، تُعالَج اللمسات داخل المنطقة المظللة العليا بواسطة النافذة العائمة؛ ولا تعمل أبداً بشكل مخفي.';
+      'يرسم جسور نافذة الترجمة العائمة فوق التطبيقات الأخرى. لا تُفتح إلا عند النقر على أيقونة النافذة العائمة في الإعدادات السريعة أو على زر النافذة العائمة. أثناء فتحها، تُعالَج اللمسات داخل المنطقة المظللة العليا بواسطة النافذة العائمة؛ ولا تعمل أبداً بشكل مخفي.';
 
   @override
   String get pagesPermissionOverlayGrant => 'تفعيل';
@@ -374,11 +374,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get pagesPermissionQuickSettingsTitle =>
-      'بلاطة \"ترجم\" في الإعدادات السريعة';
+      'أيقونة النافذة العائمة في الإعدادات السريعة';
 
   @override
   String get pagesPermissionQuickSettingsBody =>
-      'يضيف جسور بلاطةً إلى الإعدادات السريعة (أندرويد 7 وما فوق) لفتح النافذة العائمة مباشرةً. تتطلّب تفعيل إذن النافذة العائمة.';
+      'يضيف جسور أيقونةً إلى الإعدادات السريعة (أندرويد 7 وما فوق) لفتح النافذة العائمة مباشرةً. تتطلّب تفعيل إذن النافذة العائمة.';
 
   @override
   String get pagesPermissionFilesTitle => 'استيراد الملفات';
@@ -433,7 +433,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get pagesHowToUseStep5 =>
-      'للحصول على مترجم عائم فوق أي تطبيق، أضف بلاطة \"ترجم\" من الإعدادات السريعة واضغط عليها لفتح النافذة العائمة.';
+      'للحصول على مترجم عائم فوق أي تطبيق، أضف أيقونة النافذة العائمة من الإعدادات السريعة واضغط عليها لفتح النافذة العائمة.';
 
   @override
   String get pagesHowToWritePromptsHeader => 'كيف تكتب مطالبات (prompts) جيدة';
@@ -796,6 +796,32 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileVisionModelPlaceholder => 'لترجمة الصور';
+
+  @override
+  String get profileReasoningEffortLabel => 'مستوى التفكير';
+
+  @override
+  String get profileReasoningEffortAuto => 'تلقائي (افتراضي النموذج)';
+
+  @override
+  String get profileReasoningEffortNone => 'بدون';
+
+  @override
+  String get profileReasoningEffortLow => 'منخفض';
+
+  @override
+  String get profileReasoningEffortMedium => 'متوسط';
+
+  @override
+  String get profileReasoningEffortHigh => 'عالٍ';
+
+  @override
+  String get profileReasoningEffortHelper =>
+      'مقدار التفكير الذي يبذله النموذج قبل الترجمة. المستوى الأعلى أبطأ ويستهلك رموزًا أكثر. لا تُعرض إلا المستويات التي يقبلها هذا النموذج.';
+
+  @override
+  String get profileReasoningEffortOpenRouterOnly =>
+      'مستوى التفكير متاح على مزود OpenRouter فقط.';
 
   @override
   String get profileApiKeyLabel => 'مفتاح API';

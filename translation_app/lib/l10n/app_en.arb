@@ -1257,6 +1257,39 @@
     "description": "Placeholder in the vision model field when no vision model is chosen yet."
   },
 
+  "profileReasoningEffortLabel": "Reasoning effort",
+  "@profileReasoningEffortLabel": {
+    "description": "Label of the reasoning effort selector."
+  },
+  "profileReasoningEffortAuto": "Auto (model default)",
+  "@profileReasoningEffortAuto": {
+    "description": "Option meaning the model's own default effort."
+  },
+  "profileReasoningEffortNone": "None",
+  "@profileReasoningEffortNone": {
+    "description": "Reasoning effort level: none."
+  },
+  "profileReasoningEffortLow": "Low",
+  "@profileReasoningEffortLow": {
+    "description": "Reasoning effort level: low."
+  },
+  "profileReasoningEffortMedium": "Medium",
+  "@profileReasoningEffortMedium": {
+    "description": "Reasoning effort level: medium."
+  },
+  "profileReasoningEffortHigh": "High",
+  "@profileReasoningEffortHigh": {
+    "description": "Reasoning effort level: high."
+  },
+  "profileReasoningEffortHelper": "How hard the model thinks before translating. Higher effort is slower and uses more tokens. Only the levels this model accepts are offered.",
+  "@profileReasoningEffortHelper": {
+    "description": "Helper text explaining what reasoning effort does."
+  },
+  "profileReasoningEffortOpenRouterOnly": "Reasoning effort is available on the OpenRouter provider only.",
+  "@profileReasoningEffortOpenRouterOnly": {
+    "description": "Helper shown when the provider does not support reasoning effort."
+  },
+
   "profileApiKeyLabel": "API Key",
   "@profileApiKeyLabel": {
     "description": "Label of the API key selector field."

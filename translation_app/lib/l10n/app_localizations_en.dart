@@ -790,6 +790,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileVisionModelPlaceholder => 'For image translation';
 
   @override
+  String get profileReasoningEffortLabel => 'Reasoning effort';
+
+  @override
+  String get profileReasoningEffortAuto => 'Auto (model default)';
+
+  @override
+  String get profileReasoningEffortNone => 'None';
+
+  @override
+  String get profileReasoningEffortLow => 'Low';
+
+  @override
+  String get profileReasoningEffortMedium => 'Medium';
+
+  @override
+  String get profileReasoningEffortHigh => 'High';
+
+  @override
+  String get profileReasoningEffortHelper =>
+      'How hard the model thinks before translating. Higher effort is slower and uses more tokens. Only the levels this model accepts are offered.';
+
+  @override
+  String get profileReasoningEffortOpenRouterOnly =>
+      'Reasoning effort is available on the OpenRouter provider only.';
+
+  @override
   String get profileApiKeyLabel => 'API Key';
 
   @override

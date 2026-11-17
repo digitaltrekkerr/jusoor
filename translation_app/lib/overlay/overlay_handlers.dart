@@ -9,6 +9,7 @@ import 'package:translation_core/translation_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:history/history.dart';
 
+import '../utils/image_payload.dart';
 import 'overlay_utils.dart';
 import '../providers/translation_provider.dart';
 
@@ -371,11 +372,20 @@ Future<void> _handleScreenshot(Map<String, dynamic> map) async {
       apiKeyValue: apiKeyValue,
     );
 
+    // Downscale before sending. A raw native-resolution screenshot clears
+    // the size limits OpenAI-style gateways enforce and Anthropic hard-
+    // rejects instead of downscaling, which is what made Claude 400 where
+    // GPT models worked.
+    final prepared = await ImagePayloadPreparer.prepare(
+      imageBytes,
+      mimeType: 'image/png',
+    );
+
     final request = buildTemplateRequest(
       inputText: 'Translate text from image',
       targetLanguage: targetLanguage,
-      imageBase64: base64Encode(imageBytes),
-      imageMimeType: 'image/png',
+      imageBase64: prepared.base64,
+      imageMimeType: prepared.mimeType,
       wordCount: 0,
       model: profile.visionModel ?? profile.model,
       template: template,

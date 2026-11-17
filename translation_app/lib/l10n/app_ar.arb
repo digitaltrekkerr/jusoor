@@ -1257,6 +1257,39 @@
     "description": "نص مؤقت في حقل نموذج الرؤية عندما لا يوجد نموذج مختار."
   },
 
+  "profileReasoningEffortLabel": "مستوى التفكير",
+  "@profileReasoningEffortLabel": {
+    "description": "عنوان اختيار مستوى التفكير."
+  },
+  "profileReasoningEffortAuto": "تلقائي (افتراضي النموذج)",
+  "@profileReasoningEffortAuto": {
+    "description": "خيار يعني استخدام المستوى الافتراضي للنموذج."
+  },
+  "profileReasoningEffortNone": "بدون",
+  "@profileReasoningEffortNone": {
+    "description": "مستوى تفكير: بدون."
+  },
+  "profileReasoningEffortLow": "منخفض",
+  "@profileReasoningEffortLow": {
+    "description": "مستوى تفكير: منخفض."
+  },
+  "profileReasoningEffortMedium": "متوسط",
+  "@profileReasoningEffortMedium": {
+    "description": "مستوى تفكير: متوسط."
+  },
+  "profileReasoningEffortHigh": "عالٍ",
+  "@profileReasoningEffortHigh": {
+    "description": "مستوى تفكير: عالٍ."
+  },
+  "profileReasoningEffortHelper": "مقدار التفكير الذي يبذله النموذج قبل الترجمة. المستوى الأعلى أبطأ ويستهلك رموزًا أكثر. لا تُعرض إلا المستويات التي يقبلها هذا النموذج.",
+  "@profileReasoningEffortHelper": {
+    "description": "نص مساعد يشرح أثر مستوى التفكير."
+  },
+  "profileReasoningEffortOpenRouterOnly": "مستوى التفكير متاح على مزود OpenRouter فقط.",
+  "@profileReasoningEffortOpenRouterOnly": {
+    "description": "نص مساعد يظهر عندما لا يدعم المزود مستوى التفكير."
+  },
+
   "profileApiKeyLabel": "مفتاح API",
   "@profileApiKeyLabel": {
     "description": "تسمية حقل اختيار مفتاح API."

@@ -86,6 +86,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String? _selectedModel;
   String? _selectedVisionModel;
 
+  /// Reasoning effort the user picked, or `null` for the model's own default.
+  ///
+  /// Only meaningful for [ProviderType.openrouter]; other providers never
+  /// emit a `reasoning` block, so the control is shown but disabled for them.
+  ReasoningEffort? _reasoningEffort;
+
+  /// Reasoning capabilities of every model, as reported by the provider.
+  ///
+  /// This is what keeps an effort from becoming an HTTP 400: OpenRouter
+  /// rejects an effort the selected model does not accept, so the selector
+  /// and the value put on the wire are both filtered through this.
+  List<ModelCapabilities> _capabilities = [];
+
   /// When true, the API Key `InputDecorator` renders with a red border to
   /// draw the user's attention to it. Set when the user attempts to pick
   /// a model without selecting an API key first; cleared automatically
@@ -231,6 +244,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     _selectedModel = profile.model;
     _selectedVisionModel = profile.visionModel;
+    _reasoningEffort = ReasoningEffort.fromWire(profile.reasoningEffort);
 
     if (_canFetchModels) {
       _fetchModels();
@@ -275,9 +289,25 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
       if (!mounted) return;
 
+      // Capabilities come from the same endpoint and are needed to decide
+      // which efforts the selected model actually accepts.
+      var capabilities = const <ModelCapabilities>[];
+      try {
+        capabilities = await provider.fetchModelCapabilities();
+      } catch (_) {
+        // Without a listing we still let the user choose an effort and send
+        // what they asked for, so a failed probe must not disable the
+        // feature. A rejected combination now reports the provider's own
+        // reason instead of Dio's status-code boilerplate.
+        capabilities = const <ModelCapabilities>[];
+      }
+
+      if (!mounted) return;
+
       setState(() {
         _availableModels = models;
         _availableVisionModels = models;
+        _capabilities = capabilities;
         _isLoadingModels = false;
 
         if (_selectedModel != null && !models.contains(_selectedModel)) {
@@ -524,6 +554,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Reasoning effort, chosen alongside the model it applies to.
+          // Shown for every provider; only OpenRouter acts on it.
+          _buildEffortSelector(l10n),
           const SizedBox(height: 16),
 
           InputDecorator(
@@ -627,6 +662,100 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
+  /// Capabilities of [modelId], or "unknown" when the listing does not
+  /// include it (a hand-typed model, or a failed capability probe).
+  ///
+  /// "Unknown" is deliberately permissive: it lets the user's choice through
+  /// instead of silently disabling the setting, and any rejection now comes
+  /// back as the provider's own message.
+  ModelCapabilities _capabilitiesFor(String? modelId) {
+    if (modelId == null) return ModelCapabilities.unknown('');
+    for (final capability in _capabilities) {
+      if (capability.id == modelId) return capability;
+    }
+    return ModelCapabilities.unknown(modelId);
+  }
+
+  /// Efforts the selected model accepts, for the effort selector.
+  ///
+  /// Falls back to the full set while capabilities are still loading or the
+  /// model is a hand-typed one that is not in the listing.
+  List<ReasoningEffort> get _selectableEfforts {
+    final model = _selectedModel;
+    if (model == null) return ReasoningEffort.values;
+    final capabilities = _capabilitiesFor(model);
+    final selectable = capabilities.selectableEfforts;
+    return selectable.isEmpty
+        ? ReasoningEffort.values
+        : selectable;
+  }
+
+  /// Builds the reasoning-effort selector.
+  ///
+  /// Rendered for every provider so the settings screen reads the same
+  /// everywhere, but only enabled for OpenRouter — the one provider that
+  /// reports and honours reasoning effort. The others have no `reasoning`
+  /// concept on the wire, so choosing a value would do nothing.
+  Widget _buildEffortSelector(AppLocalizations l10n) {
+    final isOpenRouter = _providerType == ProviderType.openrouter;
+    final efforts = _selectableEfforts;
+    final current = _reasoningEffort;
+
+    // A model whose reasoning cannot be switched off has no "off" option, so
+    // never leave the field showing an effort the model would refuse.
+    final effectiveCurrent =
+        current != null && !efforts.contains(current) ? efforts.firstOrNull : current;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: l10n.profileReasoningEffortLabel,
+          border: const OutlineInputBorder(),
+          helperText: isOpenRouter
+              ? l10n.profileReasoningEffortHelper
+              : l10n.profileReasoningEffortOpenRouterOnly,
+          helperMaxLines: 3,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<ReasoningEffort?>(
+            isExpanded: true,
+            value: effectiveCurrent,
+            items: [
+              DropdownMenuItem<ReasoningEffort?>(
+                value: null,
+                child: Text(l10n.profileReasoningEffortAuto),
+              ),
+              ...efforts.map(
+                (effort) => DropdownMenuItem<ReasoningEffort?>(
+                  value: effort,
+                  child: Text(_effortLabel(l10n, effort)),
+                ),
+              ),
+            ],
+            onChanged: isOpenRouter
+                ? (value) => setState(() => _reasoningEffort = value)
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Localized name for [effort].
+  String _effortLabel(AppLocalizations l10n, ReasoningEffort effort) {
+    switch (effort) {
+      case ReasoningEffort.none:
+        return l10n.profileReasoningEffortNone;
+      case ReasoningEffort.low:
+        return l10n.profileReasoningEffortLow;
+      case ReasoningEffort.medium:
+        return l10n.profileReasoningEffortMedium;
+      case ReasoningEffort.high:
+        return l10n.profileReasoningEffortHigh;
+    }
+  }
+
   Future<void> _saveProfile() async {
     final l10n = AppLocalizations.of(context);
     final name = _nameController.text.trim();
@@ -685,6 +814,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 : _baseUrlController.text.trim()
           : null,
       isBuiltIn: _isEditing ? widget.profile!.isBuiltIn : false,
+      reasoningEffort: _providerType == ProviderType.openrouter
+          ? _reasoningEffort?.wireValue
+          : null,
+      reasoningExclude: _isEditing
+          ? widget.profile!.reasoningExclude
+          : true,
     );
 
     await ref.read(profilesProvider.notifier).saveProfile(profile);

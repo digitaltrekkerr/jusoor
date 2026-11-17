@@ -1490,6 +1490,54 @@ abstract class AppLocalizations {
   /// **'For image translation'**
   String get profileVisionModelPlaceholder;
 
+  /// Label of the reasoning effort selector.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning effort'**
+  String get profileReasoningEffortLabel;
+
+  /// Option meaning the model's own default effort.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (model default)'**
+  String get profileReasoningEffortAuto;
+
+  /// Reasoning effort level: none.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get profileReasoningEffortNone;
+
+  /// Reasoning effort level: low.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get profileReasoningEffortLow;
+
+  /// Reasoning effort level: medium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get profileReasoningEffortMedium;
+
+  /// Reasoning effort level: high.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get profileReasoningEffortHigh;
+
+  /// Helper text explaining what reasoning effort does.
+  ///
+  /// In en, this message translates to:
+  /// **'How hard the model thinks before translating. Higher effort is slower and uses more tokens. Only the levels this model accepts are offered.'**
+  String get profileReasoningEffortHelper;
+
+  /// Helper shown when the provider does not support reasoning effort.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning effort is available on the OpenRouter provider only.'**
+  String get profileReasoningEffortOpenRouterOnly;
+
   /// Label of the API key selector field.
   ///
   /// In en, this message translates to:

@@ -8,9 +8,12 @@ import 'package:dio/dio.dart';
 
 import '../exceptions/translation_exception.dart';
 import '../exceptions/translation_cancelled_exception.dart';
+import '../models/model_capabilities.dart';
 import '../models/translation_request.dart';
 import '../models/translation_provider.dart';
 import '../utils/dio_factory.dart';
+import '../utils/dio_error_extractor.dart';
+import '../utils/image_payload_guard.dart';
 import '../utils/response_path_extractor.dart';
 import '../utils/sse_parser.dart';
 import '../utils/variable_substitutor.dart';
@@ -56,6 +59,14 @@ class OpenAICompatibleProvider implements TranslationProvider {
     return '$base/chat/completions';
   }
 
+  /// An OpenAI-compatible gateway is arbitrary — some expose reasoning, some
+  /// don't — and there is no standard field to discover which.
+  ///
+  /// Effort is therefore an OpenRouter-only feature: this provider always
+  /// reports no capabilities and never emits a `reasoning` block.
+  @override
+  Future<List<ModelCapabilities>> fetchModelCapabilities() async => const [];
+
   @override
   Future<List<String>> fetchModels() async {
     try {
@@ -75,7 +86,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
           .toList();
     } on DioException catch (e) {
       throw TranslationException(
-        e.message ?? 'Failed to fetch models',
+        describeDioError(e, provider: 'OpenAI'),
         statusCode: e.response?.statusCode,
       );
     } catch (e) {
@@ -92,6 +103,17 @@ class OpenAICompatibleProvider implements TranslationProvider {
         (request.imageBase64 == null || request.imageBase64!.isEmpty)) {
       throw const TranslationException('Empty input: nothing to translate.');
     }
+
+    final imageBase64 = request.imageBase64;
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      final verdict =
+          ImagePayloadGuard.check(imageBase64, request.imageMimeType);
+      if (!verdict.isValid) {
+        throw TranslationException(verdict.problem!);
+      }
+    }
+
+    final isVision = imageBase64 != null && imageBase64.isNotEmpty;
     final variableMap = VariableSubstitutor.buildVariableMap(request, apiKey);
     variableMap['model'] = model;
 
@@ -106,7 +128,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
     substitutedHeaders.putIfAbsent('Content-Type', () => 'application/json');
 
     final Map<String, dynamic> bodyJson;
-    if (request.imageBase64 != null && request.imageBase64!.isNotEmpty) {
+    if (isVision) {
       bodyJson = _buildVisionBody(request);
     } else {
       final substitutedBody = VariableSubstitutor.substituteMap(
@@ -156,7 +178,7 @@ class OpenAICompatibleProvider implements TranslationProvider {
         throw const TranslationCancelledException();
       }
       throw TranslationException(
-        e.message ?? 'HTTP request failed',
+        describeDioError(e, provider: 'OpenAI'),
         statusCode: e.response?.statusCode,
       );
     } on TranslationCancelledException {
@@ -193,7 +215,8 @@ class OpenAICompatibleProvider implements TranslationProvider {
               'type': 'image_url',
               'image_url': {
                 'url':
-                    'data:${request.imageMimeType ?? 'image/jpeg'};base64,${request.imageBase64}',
+                    'data:${ImagePayloadGuard.normalizeMimeType(request.imageMimeType)};'
+                    'base64,${request.imageBase64}',
               },
             },
           ],

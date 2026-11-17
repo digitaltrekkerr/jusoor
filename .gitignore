@@ -84,7 +84,6 @@ Thumbs.db
 .opencode/
 
 # Public-release hygiene (local-only tooling, caches and internal docs)
-graphify-out/
 .specify/
 skills-lock.json
 .agents/

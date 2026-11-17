@@ -16,11 +16,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:translation_core/translation_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app.dart';
 import 'l10n/app_localizations.dart';
+import 'app.dart';
 import 'overlay/overlay_utils.dart';
 import 'providers/settings_provider.dart';
 import 'providers/translation_provider.dart';
+import 'utils/image_payload.dart';
 import 'services/deferred_temp_file_cleanup.dart';
 import 'services/settings_repository.dart';
 import 'utils/overlay_template_guard.dart';
@@ -1027,11 +1028,19 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
       apiKeyValue: apiKeyValue,
     );
 
+    // Downscale before sending — see the note in
+    // ImagePayloadPreparer about Anthropic rejecting oversized images that
+    // OpenAI-compatible gateways would silently downscale.
+    final prepared = await ImagePayloadPreparer.prepare(
+      imageBytes,
+      mimeType: 'image/png',
+    );
+
     final request = buildTemplateRequest(
       inputText: 'Translate text from image',
       targetLanguage: _selectedLanguageName,
-      imageBase64: base64Encode(imageBytes),
-      imageMimeType: 'image/png',
+      imageBase64: prepared.base64,
+      imageMimeType: prepared.mimeType,
       wordCount: 0,
       model: profile.visionModel ?? profile.model,
       template: template,

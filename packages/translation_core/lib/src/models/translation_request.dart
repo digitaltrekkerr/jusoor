@@ -4,6 +4,8 @@
 
 import 'package:equatable/equatable.dart';
 
+import 'reasoning_effort.dart';
+
 /// A translation request carrying all the information needed to ask a
 /// translation provider for a translation.
 class TranslationRequest extends Equatable {
@@ -60,6 +62,26 @@ class TranslationRequest extends Equatable {
   /// honor it without needing direct access to the template object.
   final bool substituteTargetLanguage;
 
+  /// How much reasoning effort the model should spend, if any.
+  ///
+  /// Only honoured by the OpenRouter provider. Every other provider ignores
+  /// this field entirely and never emits a `reasoning` block.
+  ///
+  /// `null` means "send nothing", which keeps the request byte-identical to
+  /// what older versions of Jusoor produced. A value of
+  /// [ReasoningEffort.none] means "reason off" and is implemented by
+  /// omitting the `reasoning` key rather than sending `effort: "none"`,
+  /// which OpenRouter rejects on models where reasoning is mandatory.
+  final ReasoningEffort? reasoningEffort;
+
+  /// Whether reasoning tokens should be withheld from the response.
+  ///
+  /// Defaults to `true`: Jusoor streams the translation into an overlay and
+  /// a snackbar, so raw chain-of-thought would leak straight into the UI. The
+  /// tokens are still consumed and billed either way — this only controls
+  /// whether they are returned.
+  final bool reasoningExclude;
+
   /// Creates a [TranslationRequest].
   ///
   /// Only [inputText] and [targetLanguage] are required; all other fields
@@ -74,6 +96,8 @@ class TranslationRequest extends Equatable {
     this.model = 'openai/gpt-4o',
     this.profileId,
     this.substituteTargetLanguage = true,
+    this.reasoningEffort,
+    this.reasoningExclude = true,
   }) : assert(
          inputText != '' || imageBase64 != null,
          'inputText must not be empty unless imageBase64 is provided',
@@ -94,6 +118,10 @@ class TranslationRequest extends Equatable {
       profileId: json['profileId'] as String?,
       substituteTargetLanguage:
           json['substituteTargetLanguage'] as bool? ?? true,
+      reasoningEffort: ReasoningEffort.fromWire(
+        json['reasoningEffort'] as String?,
+      ),
+      reasoningExclude: json['reasoningExclude'] as bool? ?? true,
     );
   }
 
@@ -109,6 +137,8 @@ class TranslationRequest extends Equatable {
       'model': model,
       'profileId': profileId,
       'substituteTargetLanguage': substituteTargetLanguage,
+      'reasoningEffort': reasoningEffort?.name,
+      'reasoningExclude': reasoningExclude,
     };
   }
 
@@ -127,6 +157,8 @@ class TranslationRequest extends Equatable {
     String? model,
     Object? profileId = _undefined,
     bool? substituteTargetLanguage,
+    ReasoningEffort? reasoningEffort,
+    bool? reasoningExclude,
   }) {
     return TranslationRequest(
       inputText: inputText ?? this.inputText,
@@ -145,6 +177,8 @@ class TranslationRequest extends Equatable {
           : profileId as String?,
       substituteTargetLanguage:
           substituteTargetLanguage ?? this.substituteTargetLanguage,
+      reasoningEffort: reasoningEffort ?? this.reasoningEffort,
+      reasoningExclude: reasoningExclude ?? this.reasoningExclude,
     );
   }
 
@@ -159,6 +193,8 @@ class TranslationRequest extends Equatable {
         model,
         profileId,
         substituteTargetLanguage,
+        reasoningEffort,
+        reasoningExclude,
       ];
 }
 
