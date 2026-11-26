@@ -87,6 +87,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeClearButton => 'مسح';
 
   @override
+  String get homeClearTooltip => 'مسح الإدخال وإيقاف الترجمة';
+
+  @override
   String get homeShareTooltip => 'مشاركة الترجمة';
 
   @override
