@@ -117,6 +117,11 @@
     "description": "تسمية زر مسح الإدخال."
   },
 
+  "homeClearTooltip": "مسح الإدخال وإيقاف الترجمة",
+  "@homeClearTooltip": {
+    "description": "تلميح يظهر على زر المسح أثناء تشغيل الترجمة."
+  },
+
   "homeShareTooltip": "مشاركة الترجمة",
   "@homeShareTooltip": {
     "description": "تلميح أيقونة مشاركة الترجمة."

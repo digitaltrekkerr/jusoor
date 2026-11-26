@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'Clear'**
   String get homeClearButton;
 
+  /// Tooltip shown on the Clear button while a translation is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear input and stop the translation'**
+  String get homeClearTooltip;
+
   /// Tooltip for the share-translation icon button.
   ///
   /// In en, this message translates to:

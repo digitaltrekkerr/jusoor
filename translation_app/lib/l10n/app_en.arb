@@ -117,6 +117,11 @@
     "description": "Clear-input secondary button label."
   },
 
+  "homeClearTooltip": "Clear input and stop the translation",
+  "@homeClearTooltip": {
+    "description": "Tooltip shown on the Clear button while a translation is running."
+  },
+
   "homeShareTooltip": "Share translation",
   "@homeShareTooltip": {
     "description": "Tooltip for the share-translation icon button."

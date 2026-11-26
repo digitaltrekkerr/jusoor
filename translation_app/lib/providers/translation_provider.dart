@@ -113,6 +113,10 @@ final translationProvider =
 class TranslationNotifier extends Notifier<TranslationState> {
   bool _isCancelled = false;
 
+  /// Monotonic run generation. Any async callback whose captured generation is
+  /// stale must return without touching state or persisting history.
+  int _runId = 0;
+
   /// Aborts the in-flight HTTP request when cancelled. Created fresh for
   /// every [translate] cycle so a cancelled token never leaks into the next
   /// request.
@@ -120,6 +124,12 @@ class TranslationNotifier extends Notifier<TranslationState> {
 
   @override
   TranslationState build() => const TranslationIdle();
+
+  bool _isStale(int runId) => runId != _runId;
+
+  /// True only while a request is genuinely in flight with a live token.
+  bool get hasLiveRequest =>
+      !_isCancelled && (_cancelToken?.isCancelled ?? true) == false;
 
   /// Sends a translation request and streams the response.
   ///
@@ -131,6 +141,7 @@ class TranslationNotifier extends Notifier<TranslationState> {
   /// If the primary translation fails and a fallback profile is selected,
   /// a single retry is attempted using the fallback profile.
   Future<void> translate(TranslationRequest request) async {
+    final runId = ++_runId;
     _isCancelled = false;
     _cancelToken = CancelToken();
     state = const TranslationLoading();
@@ -211,11 +222,15 @@ class TranslationNotifier extends Notifier<TranslationState> {
         provider: provider,
         request: effectiveRequest,
         stopwatch: stopwatch,
+        runId: runId,
       );
     } on TranslationCancelledException {
       // User pressed cancel — never retry via fallback, never show an error.
+      _isCancelled = true;
       _cancelToken = null;
-      state = const TranslationIdle();
+      if (!_isStale(runId)) {
+        state = const TranslationIdle();
+      }
     } on TranslationException catch (e) {
       // ── Attempt fallback if configured ───────────────────────────────
       final retried = await _tryFallback(
@@ -223,8 +238,9 @@ class TranslationNotifier extends Notifier<TranslationState> {
         systemPrompt: resolvedSystemPrompt,
         originalError: e.message,
         stopwatch: stopwatch,
+        runId: runId,
       );
-      if (!retried) {
+      if (!retried && !_isStale(runId)) {
         state = TranslationError(e.message);
       }
     } on ResponsePathException catch (e) {
@@ -233,8 +249,9 @@ class TranslationNotifier extends Notifier<TranslationState> {
         systemPrompt: resolvedSystemPrompt,
         originalError: 'Response path error: ${e.message}',
         stopwatch: stopwatch,
+        runId: runId,
       );
-      if (!retried) {
+      if (!retried && !_isStale(runId)) {
         state = TranslationError('Response path error: ${e.message}');
       }
     } catch (e) {
@@ -243,17 +260,30 @@ class TranslationNotifier extends Notifier<TranslationState> {
         systemPrompt: resolvedSystemPrompt,
         originalError: 'Unexpected error: $e',
         stopwatch: stopwatch,
+        runId: runId,
       );
-      if (!retried) {
+      if (!retried && !_isStale(runId)) {
         state = TranslationError('Unexpected error: $e');
       }
     }
   }
 
-  /// Resets the translation state back to idle.
-  void reset() {
+  /// Aborts any run in flight and returns to [TranslationIdle].
+  ///
+  /// Bumps the run generation first so every in-flight callback (stream loop,
+  /// coalescing flush timer, fallback retry, history save) is stale and cannot
+  /// write state or persist a result afterwards. Idempotent: a second call on an
+  /// already-idle notifier is a no-op apart from the generation bump.
+  void clearAll() {
+    _runId++;
+    _isCancelled = true;
+    _cancelToken?.cancel();
+    _cancelToken = null;
     state = const TranslationIdle();
   }
+
+  /// Kept for callers that only want to stop a run (Clear now uses [clearAll]).
+  void reset() => clearAll();
 
   /// Cancels the in-progress translation if any.
   ///
@@ -261,8 +291,9 @@ class TranslationNotifier extends Notifier<TranslationState> {
   /// a [TranslationCancelledException], which [translate] maps to
   /// [TranslationIdle] without touching the fallback chain.
   void cancel() {
+    if (!hasLiveRequest) return;
     _isCancelled = true;
-    _cancelToken?.cancel();
+    _cancelToken!.cancel();
   }
 
   // ── Private helpers ──────────────────────────────────────────────────
@@ -303,6 +334,7 @@ class TranslationNotifier extends Notifier<TranslationState> {
     required TranslationProvider provider,
     required TranslationRequest request,
     required Stopwatch stopwatch,
+    required int runId,
   }) async {
     final buffer = StringBuffer();
     Timer? flushTimer;
@@ -317,7 +349,7 @@ class TranslationNotifier extends Notifier<TranslationState> {
       if (flushTimer != null) return;
       flushTimer = Timer(_streamFlushInterval, () {
         flushTimer = null;
-        if (_isCancelled) return;
+        if (_isStale(runId) || _isCancelled) return;
         state = TranslationStreaming(buffer.toString());
       });
     }
@@ -326,9 +358,12 @@ class TranslationNotifier extends Notifier<TranslationState> {
       request,
       cancelToken: _cancelToken,
     )) {
-      if (_isCancelled) {
+      if (_isStale(runId) || _isCancelled) {
         cancelFlushTimer();
-        state = const TranslationIdle();
+        if (!_isStale(runId)) {
+          _cancelToken = null;
+          state = const TranslationIdle();
+        }
         return;
       }
       buffer.write(chunk);
@@ -336,6 +371,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
       // streaming output right away; subsequent chunks are coalesced.
       if (!emittedFirstChunk) {
         emittedFirstChunk = true;
+        if (_isStale(runId) || _isCancelled) {
+          cancelFlushTimer();
+          return;
+        }
         state = TranslationStreaming(buffer.toString());
       } else {
         scheduleFlush();
@@ -343,16 +382,21 @@ class TranslationNotifier extends Notifier<TranslationState> {
     }
 
     cancelFlushTimer();
-    if (_isCancelled) {
-      state = const TranslationIdle();
+    if (_isStale(runId) || _isCancelled) {
+      if (!_isStale(runId)) {
+        _cancelToken = null;
+        state = const TranslationIdle();
+      }
       return;
     }
 
     stopwatch.stop();
+    if (_isStale(runId)) return;
     final fullText = buffer.toString();
     final modelUsed = request.model;
 
     if (fullText.isEmpty) {
+      if (_isStale(runId)) return;
       state = TranslationError(
         'Translation returned an empty result. '
         'This may indicate a response parsing error or an unsupported '
@@ -361,8 +405,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
       return;
     }
 
+    if (_isStale(runId)) return;
     state = TranslationDone(fullText, modelUsed, stopwatch.elapsedMilliseconds);
 
+    if (_isStale(runId)) return;
     _saveToHistory(
       request: request,
       fullText: fullText,
@@ -381,7 +427,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
     required String systemPrompt,
     required String originalError,
     required Stopwatch stopwatch,
+    required int runId,
   }) async {
+    if (_isStale(runId) || _isCancelled) return false;
+
     final fallbackProfileId = ref.read(selectedFallbackProfileProvider);
     if (fallbackProfileId == null) return false;
 
@@ -394,9 +443,10 @@ class TranslationNotifier extends Notifier<TranslationState> {
     final apiKeyValue = await _resolveApiKey(fallbackProfile);
     if (apiKeyValue == null) return false;
 
+    if (_isStale(runId) || _isCancelled) return false;
+
     // Reset state for retry.
     state = const TranslationLoading();
-    _isCancelled = false;
 
     try {
       final provider = ProviderFactory.create(
@@ -420,21 +470,32 @@ class TranslationNotifier extends Notifier<TranslationState> {
         provider: provider,
         request: fallbackRequest,
         stopwatch: stopwatch,
+        runId: runId,
       );
       return true;
     } on TranslationCancelledException {
       // User cancelled during the fallback — go idle, do not report error.
-      state = const TranslationIdle();
+      _isCancelled = true;
+      _cancelToken = null;
+      if (!_isStale(runId)) {
+        state = const TranslationIdle();
+      }
       return true;
     } on TranslationException {
       // Retry failed — report the original error, not the retry error.
-      state = TranslationError(originalError);
+      if (!_isStale(runId)) {
+        state = TranslationError(originalError);
+      }
       return true;
     } on ResponsePathException {
-      state = TranslationError(originalError);
+      if (!_isStale(runId)) {
+        state = TranslationError(originalError);
+      }
       return true;
     } catch (e) {
-      state = TranslationError(originalError);
+      if (!_isStale(runId)) {
+        state = TranslationError(originalError);
+      }
       return true;
     }
   }

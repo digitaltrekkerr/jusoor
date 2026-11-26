@@ -84,6 +84,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeClearButton => 'Clear';
 
   @override
+  String get homeClearTooltip => 'Clear input and stop the translation';
+
+  @override
   String get homeShareTooltip => 'Share translation';
 
   @override

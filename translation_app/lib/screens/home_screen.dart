@@ -310,7 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _imageBase64 = '';
       _imageMimeType = null;
     });
-    ref.read(translationProvider.notifier).reset();
+    ref.read(translationProvider.notifier).clearAll();
   }
 
   Future<void> _handleShare() async {
@@ -455,9 +455,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     final translationState = ref.watch(translationProvider);
-    final isTranslating =
+    final notifier = ref.read(translationProvider.notifier);
+    final isRunning =
         translationState is TranslationLoading ||
         translationState is TranslationStreaming;
+    // State is authoritative because the generation guard forbids a stale run
+    // from writing state; the live-token check keeps a spent token from ever
+    // enabling Cancel again.
+    final canCancel = isRunning && notifier.hasLiveRequest;
+    final canTranslate = !isRunning &&
+        (_inputController.text.isNotEmpty || _imageBase64.isNotEmpty);
 
     return Scaffold(
       body: SafeArea(
@@ -501,9 +508,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               // ── Action buttons ──────────────────────────────────────
               _ActionButtons(
-                isTranslating: isTranslating,
-                hasInput:
-                    _inputController.text.isNotEmpty || _imageBase64.isNotEmpty,
+                isRunning: isRunning,
+                canCancel: canCancel,
+                canTranslate: canTranslate,
+                canClear: true,
                 onTranslate: _handleTranslate,
                 onCancel: () => ref.read(translationProvider.notifier).cancel(),
                 onClear: _handleClear,
@@ -1023,8 +1031,10 @@ class _ImageThumbnail extends StatelessWidget {
 // ── Action buttons ───────────────────────────────────────────────────
 
 class _ActionButtons extends StatelessWidget {
-  final bool isTranslating;
-  final bool hasInput;
+  final bool isRunning;
+  final bool canCancel;
+  final bool canTranslate;
+  final bool canClear;
   final VoidCallback onTranslate;
   final VoidCallback onCancel;
   final VoidCallback onClear;
@@ -1032,8 +1042,10 @@ class _ActionButtons extends StatelessWidget {
   final bool canShare;
 
   const _ActionButtons({
-    required this.isTranslating,
-    required this.hasInput,
+    required this.isRunning,
+    required this.canCancel,
+    required this.canTranslate,
+    required this.canClear,
     required this.onTranslate,
     required this.onCancel,
     required this.onClear,
@@ -1044,29 +1056,33 @@ class _ActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final clearButton = OutlinedButton.icon(
+      key: const ValueKey('home-clear-button'),
+      onPressed: canClear ? onClear : null,
+      icon: const Icon(Icons.clear, size: 18),
+      label: Text(l10n.homeClearButton),
+    );
     return Row(
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: !hasInput
-                ? null
-                : isTranslating
-                    ? onCancel
-                    : onTranslate,
-            icon: isTranslating
+            key: const ValueKey('home-translate-cancel-button'),
+            onPressed: isRunning
+                ? (canCancel ? onCancel : null)
+                : (canTranslate ? onTranslate : null),
+            icon: isRunning
                 ? const Icon(Icons.close)
                 : const Icon(Icons.translate),
             label: Text(
-              isTranslating ? l10n.appCancel : l10n.homeTranslateButton,
+              isRunning ? l10n.appCancel : l10n.homeTranslateButton,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: onClear,
-          icon: const Icon(Icons.clear, size: 18),
-          label: Text(l10n.homeClearButton),
-        ),
+        if (isRunning)
+          Tooltip(message: l10n.homeClearTooltip, child: clearButton)
+        else
+          clearButton,
         if (canShare) ...[
           const SizedBox(width: 8),
           IconButton.outlined(
