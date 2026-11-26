@@ -18,6 +18,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appProceed => 'متابعة';
 
   @override
+  String get appDone => 'تم';
+
+  @override
+  String get appClose => 'إغلاق';
+
+  @override
   String get navHome => 'الرئيسية';
 
   @override
@@ -55,6 +61,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get homePasteTooltip => 'لصق من الحافظة';
+
+  @override
+  String get homeExpandInputTooltip => 'تكبير الإدخال';
+
+  @override
+  String get homeInputFullscreenTitle => 'تحرير الإدخال';
 
   @override
   String get homePickImageTooltip => 'اختيار صورة';
@@ -103,6 +115,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get homeCopyTooltip => 'نسخ الترجمة';
+
+  @override
+  String get homeExpandOutputTooltip => 'تكبير الترجمة';
+
+  @override
+  String get homeOutputFullscreenTitle => 'الترجمة الكاملة';
 
   @override
   String get homeCopiedToClipboard => 'تم النسخ إلى الحافظة';

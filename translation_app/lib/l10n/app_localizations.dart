@@ -116,6 +116,18 @@ abstract class AppLocalizations {
   /// **'Proceed'**
   String get appProceed;
 
+  /// Generic done button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get appDone;
+
+  /// Generic close button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get appClose;
+
   /// Bottom navigation tab label for the home screen.
   ///
   /// In en, this message translates to:
@@ -194,6 +206,18 @@ abstract class AppLocalizations {
   /// **'Paste from clipboard'**
   String get homePasteTooltip;
 
+  /// Tooltip for the expand-input icon button.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand input'**
+  String get homeExpandInputTooltip;
+
+  /// Title of the full-screen input editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit input'**
+  String get homeInputFullscreenTitle;
+
   /// Tooltip for the pick-image icon button.
   ///
   /// In en, this message translates to:
@@ -265,6 +289,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy translation'**
   String get homeCopyTooltip;
+
+  /// Tooltip for the expand-translation icon button.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand translation'**
+  String get homeExpandOutputTooltip;
+
+  /// Title of the full-screen translation viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Full translation'**
+  String get homeOutputFullscreenTitle;
 
   /// Snackbar message shown after copying the translation.
   ///

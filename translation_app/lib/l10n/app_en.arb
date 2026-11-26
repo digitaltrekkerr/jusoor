@@ -16,6 +16,16 @@
     "description": "Generic proceed / continue button label."
   },
 
+  "appDone": "Done",
+  "@appDone": {
+    "description": "Generic done button label."
+  },
+
+  "appClose": "Close",
+  "@appClose": {
+    "description": "Generic close button label."
+  },
+
   "navHome": "Home",
   "@navHome": {
     "description": "Bottom navigation tab label for the home screen."
@@ -79,6 +89,16 @@
   "homePasteTooltip": "Paste from clipboard",
   "@homePasteTooltip": {
     "description": "Tooltip for the paste-from-clipboard icon button."
+  },
+
+  "homeExpandInputTooltip": "Expand input",
+  "@homeExpandInputTooltip": {
+    "description": "Tooltip for the expand-input icon button."
+  },
+
+  "homeInputFullscreenTitle": "Edit input",
+  "@homeInputFullscreenTitle": {
+    "description": "Title of the full-screen input editor."
   },
 
   "homePickImageTooltip": "Pick image",
@@ -145,6 +165,16 @@
   "homeCopyTooltip": "Copy translation",
   "@homeCopyTooltip": {
     "description": "Tooltip for the copy-translation icon button."
+  },
+
+  "homeExpandOutputTooltip": "Expand translation",
+  "@homeExpandOutputTooltip": {
+    "description": "Tooltip for the expand-translation icon button."
+  },
+
+  "homeOutputFullscreenTitle": "Full translation",
+  "@homeOutputFullscreenTitle": {
+    "description": "Title of the full-screen translation viewer."
   },
 
   "homeCopiedToClipboard": "Copied to clipboard",

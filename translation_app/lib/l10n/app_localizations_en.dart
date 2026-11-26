@@ -18,6 +18,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appProceed => 'Proceed';
 
   @override
+  String get appDone => 'Done';
+
+  @override
+  String get appClose => 'Close';
+
+  @override
   String get navHome => 'Home';
 
   @override
@@ -55,6 +61,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homePasteTooltip => 'Paste from clipboard';
+
+  @override
+  String get homeExpandInputTooltip => 'Expand input';
+
+  @override
+  String get homeInputFullscreenTitle => 'Edit input';
 
   @override
   String get homePickImageTooltip => 'Pick image';
@@ -100,6 +112,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeCopyTooltip => 'Copy translation';
+
+  @override
+  String get homeExpandOutputTooltip => 'Expand translation';
+
+  @override
+  String get homeOutputFullscreenTitle => 'Full translation';
 
   @override
   String get homeCopiedToClipboard => 'Copied to clipboard';
