@@ -16,6 +16,16 @@
     "description": "تسمية زر المتابعة العامة."
   },
 
+  "appDone": "تم",
+  "@appDone": {
+    "description": "تسمية زر تم العامة."
+  },
+
+  "appClose": "إغلاق",
+  "@appClose": {
+    "description": "تسمية زر الإغلاق العامة."
+  },
+
   "navHome": "الرئيسية",
   "@navHome": {
     "description": "تسمية تبويب الشاشة الرئيسية في شريط التنقل السفلي."
@@ -79,6 +89,16 @@
   "homePasteTooltip": "لصق من الحافظة",
   "@homePasteTooltip": {
     "description": "تلميح أيقونة اللصق من الحافظة."
+  },
+
+  "homeExpandInputTooltip": "تكبير الإدخال",
+  "@homeExpandInputTooltip": {
+    "description": "تلميح أيقونة تكبير الإدخال."
+  },
+
+  "homeInputFullscreenTitle": "تحرير الإدخال",
+  "@homeInputFullscreenTitle": {
+    "description": "عنوان محرر الإدخال بملء الشاشة."
   },
 
   "homePickImageTooltip": "اختيار صورة",
@@ -145,6 +165,16 @@
   "homeCopyTooltip": "نسخ الترجمة",
   "@homeCopyTooltip": {
     "description": "تلميح أيقونة نسخ الترجمة."
+  },
+
+  "homeExpandOutputTooltip": "تكبير الترجمة",
+  "@homeExpandOutputTooltip": {
+    "description": "تلميح أيقونة تكبير الترجمة."
+  },
+
+  "homeOutputFullscreenTitle": "الترجمة الكاملة",
+  "@homeOutputFullscreenTitle": {
+    "description": "عنوان عارض الترجمة بملء الشاشة."
   },
 
   "homeCopiedToClipboard": "تم النسخ إلى الحافظة",
