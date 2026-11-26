@@ -11,8 +11,12 @@ class LanguageEntry {
 }
 
 /// Languages available for the translation target selector.
+/// The first three entries are pinned to Arabic, English, Turkish (ar, en, tr);
+/// every picker list must be derived from this list (see tests/widgets/language_order_test.dart).
 const kLanguageEntries = [
+  LanguageEntry(name: 'Arabic', code: 'ar'),
   LanguageEntry(name: 'English', code: 'en'),
+  LanguageEntry(name: 'Turkish', code: 'tr'),
   LanguageEntry(name: 'Spanish', code: 'es'),
   LanguageEntry(name: 'French', code: 'fr'),
   LanguageEntry(name: 'German', code: 'de'),
@@ -22,9 +26,7 @@ const kLanguageEntries = [
   LanguageEntry(name: 'Chinese', code: 'zh'),
   LanguageEntry(name: 'Japanese', code: 'ja'),
   LanguageEntry(name: 'Korean', code: 'ko'),
-  LanguageEntry(name: 'Arabic', code: 'ar'),
   LanguageEntry(name: 'Hindi', code: 'hi'),
-  LanguageEntry(name: 'Turkish', code: 'tr'),
   LanguageEntry(name: 'Dutch', code: 'nl'),
   LanguageEntry(name: 'Polish', code: 'pl'),
   LanguageEntry(name: 'Swedish', code: 'sv'),
