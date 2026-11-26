@@ -362,7 +362,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
         prefs.getString(_kDefaultTargetLanguageKey) ??
         'Arabic';
 
-    if (!_kLanguageNames.contains(languageCode)) {
+    if (!kLanguages.contains(languageCode)) {
       languageCode = 'Arabic';
     }
 
@@ -1142,38 +1142,6 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
     _saveSelectedLanguage(name, code);
   }
 
-  static const List<String> _kLanguageNames = [
-    'English',
-    'Spanish',
-    'French',
-    'German',
-    'Italian',
-    'Portuguese',
-    'Russian',
-    'Chinese',
-    'Japanese',
-    'Korean',
-    'Arabic',
-    'Hindi',
-    'Turkish',
-    'Dutch',
-    'Polish',
-    'Swedish',
-    'Danish',
-    'Finnish',
-    'Norwegian',
-    'Czech',
-    'Greek',
-    'Hebrew',
-    'Thai',
-    'Vietnamese',
-    'Indonesian',
-    'Ukrainian',
-    'Romanian',
-    'Hungarian',
-    'Catalan',
-  ];
-
   @override
   Widget build(BuildContext context) {
     final isFull = _isFullMode;
@@ -1514,9 +1482,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
             Expanded(
               child: ListView.builder(
                 controller: scrollController,
-                itemCount: _kLanguageNames.length,
+                itemCount: kLanguages.length,
                 itemBuilder: (context, index) {
-                  final name = _kLanguageNames[index];
+                  final name = kLanguages[index];
                   final isSelected = _selectedLanguageName == name;
                   return ListTile(
                     leading: Icon(
