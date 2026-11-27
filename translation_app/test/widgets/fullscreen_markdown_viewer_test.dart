@@ -72,6 +72,17 @@ void main() {
       expect(find.textContaining('Hello'), findsWidgets);
     });
 
+    testWidgets('exactly one close affordance (leading, direction-aware)',
+        (tester) async {
+      notifier.emit(const TranslationDone('**Hello** world', 'gpt-4o', 1200));
+      await pushViewer(tester);
+
+      // The fullscreenDialog route draws the leading close button; the AppBar
+      // must not add a second one in `actions`.
+      expect(find.byType(CloseButton), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+    });
+
     testWidgets('copy writes plain text', (tester) async {
       notifier.emit(const TranslationDone('**Hello** world', 'gpt-4o', 1200));
       await pushViewer(tester);
