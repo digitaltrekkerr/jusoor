@@ -23,6 +23,9 @@ class FullscreenMarkdownViewer extends ConsumerWidget {
       text = state.fullText;
     }
 
+    // The route is a fullscreenDialog, so Flutter already draws a leading
+    // close button on the side that matches the text direction (right in
+    // RTL, left in LTR). No second close action belongs in `actions`.
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.homeOutputFullscreenTitle),
@@ -34,11 +37,6 @@ class FullscreenMarkdownViewer extends ConsumerWidget {
               onPressed: () => copyTranslationText(context, text!),
               onLongPress: () => showCopyOptions(context, text!),
             ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: l10n.appClose,
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
         ],
       ),
       body: SafeArea(
