@@ -4,6 +4,14 @@ name: Release
   push:
     branches:
       - main
+    # Docs-only commits must not burn a build: markdown, screenshots and the
+    # workflow itself cannot change the APK. Tag pushes ignore these filters,
+    # so a release tag always builds.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/**"
+      - "LICENSE"
     # Semver tags (v0.1.7, v1.0.0, …) publish a non-prerelease GitHub
     # Release that the in-app update checker treats as the latest version.
     tags:

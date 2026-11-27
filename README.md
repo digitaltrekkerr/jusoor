@@ -1,6 +1,8 @@
-# Jusoor · جسور
+# Jusoor
 
 **Bridge the language gap — AI translation that floats above any app.**
+
+**Read this in:** English · [Arabic](README.ar.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208%2B-3DDC84?logo=android&logoColor=white)](https://www.android.com/)
@@ -47,11 +49,15 @@ bring your own API keys, stored only on your device.
 - **Text & image input** — type or paste text, pick an image, or share content
   straight into Jusoor from any app.
 - **29 languages + Auto Detect** — pick your target language; the source is
-  detected automatically.
+  detected automatically. Arabic, English, and Turkish sit at the top of the
+  list.
 - **Prompt templates** — reusable templates with `{{target_language}}`
   substitution (or send it literally with the per-template toggle).
 - **Bring your own provider** — Google Gemini, OpenRouter, or any
   OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, …).
+- **Readable results** — full-screen editor and viewer for long input and long
+  translations, plus a text-size setting in px (system size by default, with a
+  separate size for translation output only).
 - **Translation history** — every result is saved, searchable, and shareable.
 - **Arabic-first UI** — complete RTL layout, English secondary, instant locale
   switch from Settings.
@@ -77,8 +83,11 @@ with one-tap shortcuts to grant or revoke.
 
 ## Download & Install
 
-**Prebuilt APK:** see [Releases](https://github.com/digitaltrekkerr/jusoor/releases)
-— coming with the first public release.
+Grab the APK from the [Releases](https://github.com/digitaltrekkerr/jusoor/releases)
+page — `arm64-v8a` for phones and tablets, `x86_64` for emulators. Every release
+also carries `armeabi-v7a` for older 32-bit devices. The APK ships with no
+credentials: you enter your own provider API key in Settings, and it stays on
+your device.
 
 **Build from source:**
 
@@ -130,120 +139,3 @@ Released under the [MIT License](LICENSE).
 If Jusoor saves you time, consider supporting development on
 [Patreon](https://www.patreon.com/cw/DigitalTrekkerr/membership), and give the
 repo a ⭐ if you find it useful.
-
----
-
-<div dir="rtl">
-
-# جسور · Jusoor
-
-**عبر فجوة اللغات — ترجمة بالذكاء الاصطناعي تطفو فوق أي تطبيق.**
-
-جسور تطبيق أندرويد مجاني ومفتوح المصدر يضع قوة الترجمة بالذكاء الاصطناعي في
-نافذة عائمة فوق أي تطبيق آخر: انسخ أو التقط شاشة أو شارك نصاً أو صورة، واحصل
-على ترجمتها فوراً عبر مزوّد الذكاء الاصطناعي الذي تختاره بنفسك.
-
-| Home | Settings |
-|---|---|
-| ![Home](docs/screenshots/home.png) | ![Settings](docs/screenshots/settings.png) |
-| **Permissions** | **Instructions** |
-| ![Permissions](docs/screenshots/permissions.png) | ![Instructions](docs/screenshots/instructions.png) |
-
-## ما هو جسور؟
-
-صُمّم جسور لتلك اللحظات التي تصطدم فيها بلغة لا تفهمها وأنت داخل تطبيق آخر:
-بدل الخروج من التطبيق، تستدعي نافذة جسور العائمة فوق ما تعمل عليه وتحصل على
-الترجمة في الحال. الواجهة عربية أولاً باتجاه كامل من اليمين إلى اليسار مع دعم
-إنجليزي كامل، وتبقى أنت المتحكّم: تُدخل مفاتيح API الخاصة بك، وتُحفظ على جهازك
-فقط.
-
-- **ترجمة فوق كل شيء** — نافذة عائمة تعمل فوق التطبيقات الأخرى، مع زر
-  تشغيل/إيقاف في لوحة الإعدادات السريعة.
-- **إدخال نصي وصوري** — اكتب أو الصق نصاً، أو اختر صورة، أو شارك المحتوى
-  مباشرةً إلى جسور من أي تطبيق.
-- **٢٩ لغة + الكشف التلقائي** — اختر لغة الهدف، وتُكتشف لغة المصدر تلقائياً.
-- **قوالب مطالبات (Templates)** — قوالب قابلة لإعادة الاستخدام مع استبدال
-  المتغير `{{target_language}}` تلقائياً، أو إرساله حرفياً عبر خيار لكل قالب.
-- **اختر مزوّدك بنفسك** — Google Gemini أو OpenRouter أو أي نقطة نهاية متوافقة
-  مع OpenAI‏ (Ollama و LM Studio و vLLM وغيرها).
-- **سجل الترجمات** — كل نتيجة تُحفظ، وقابلة للبحث والمشاركة.
-- **واجهة عربية أولاً** — تخطيط كامل بالاتجاه من اليمين إلى اليسار، والإنجليزية
-  خيار ثانٍ، مع تبديل فوري للغة من الإعدادات.
-- **الخصوصية أولاً** — مفاتيح API تبقى على جهازك عبر تخزين آمن، والطلبات تنطلق
-  مباشرةً من هاتفك إلى مزوّدك دون أي وسيط.
-
-## لماذا هذه الأذونات؟
-
-لا يطلب جسور إلا ما تحتاجه ميزاته فعلاً. هذه القائمة بشفافية كاملة:
-
-| الإذن | لماذا يحتاجه جسور |
-| --- | --- |
-| `INTERNET` | للوصول إلى مزوّد الذكاء الاصطناعي الذي تُعدّه؛ يُمنح تلقائياً عند التثبيت. |
-| `SYSTEM_ALERT_WINDOW` | لعرض النافذة العائمة فوق التطبيقات الأخرى — الميزة الأساسية؛ يُمنح عبر إعدادات النظام. |
-| `FOREGROUND_SERVICE` | للحفاظ على عمل النافذة العائمة أثناء استخدامك للتطبيقات الأخرى. |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | تصريح نوع الخدمة الأمامية الخاص بالنافذة العائمة (متطلب من أندرويد). |
-| `FOREGROUND_SERVICE_MEDIA_PROJECTION` | يشغّل «لقطة شاشة ← ترجمة»؛ كل التقاط يتطلب موافقة صريحة من النظام. |
-| `POST_NOTIFICATIONS` | إشعار خدمة النافذة العائمة (أندرويد 13 وما بعده). |
-| `WAKE_LOCK` | يُدمَج تلقائياً من إضافة النافذة العائمة؛ يحافظ على استجابة النافذة. |
-
-تعرض صفحة **الأذونات** داخل التطبيق حالة كل إذن لحظياً، مع اختصار بلمسة واحدة
-للمنح أو السحب.
-
-## التنزيل والتثبيت
-
-**حزمة APK جاهزة:** راجع صفحة
-[الإصدارات](https://github.com/digitaltrekkerr/jusoor/releases) — قادمة مع أول
-إصدار عام.
-
-**البناء من المصدر:**
-
-المتطلبات:
-
-- Flutter SDK ‏(القناة المستقرة؛ يستهدف المشروع ‏Dart SDK ‏`^3.10.8`)
-- Android SDK — يُصرَّف وفق API 36 ويعمل على أندرويد 8.0 فما فوق (API 26)
-- [Melos](https://pub.dev/packages/melos) ‏(`dart pub global activate melos`)
-
-```bash
-git clone https://github.com/digitaltrekkerr/jusoor.git
-cd jusoor
-melos bootstrap        # يربط حزم مساحة العمل عبر pubspec overrides
-cd translation_app
-flutter run            # مع جهاز أو محاكٍ متصل
-```
-
-لبناء نسخة الإصدار: `flutter build apk --release` (إعدادات التوقيع موجودة في
-`translation_app/android/app/build.gradle`).
-
-## البنية المعمارية
-
-مساحة عمل Melos — تطبيق واحد وأربع حزم متخصصة:
-
-| المسار | الدور |
-| --- | --- |
-| `translation_app/` | تطبيق Flutter نفسه: الشاشات، الترجمة المحلية (AR/EN)، حالة Riverpod، وتكامل النافذة العائمة. |
-| `packages/translation_core/` | عملاء المزوّدين (Gemini و OpenRouter والمتوافق مع OpenAI) والنماذج والقوالب. |
-| `packages/file_handler/` | قراءة الملفات وكشف نوع MIME للملفات المشتركة أو المستوردة. |
-| `packages/history/` | حفظ سجل الترجمات والاستعلام عنه. |
-| `packages/markdown_renderer/` | عرض نتائج Markdown بوعي الاتجاه الثنائي (BiDi). |
-
-## المساهمة
-
-نرحب بمساهماتكم! يُرجى قراءة [CONTRIBUTING.md](CONTRIBUTING.md) أولاً، وتشغيل
-`melos analyze` و `melos test` قبل فتح طلب الدمج.
-
-## الأمان
-
-هل عثرت على ثغرة؟ من فضلك **لا تفتح** مشكلة عامة — اتبع خطوات الإبلاغ الموضحة
-في [SECURITY.md](SECURITY.md).
-
-## الرخصة
-
-يُنشر المشروع بموجب رخصة [MIT](LICENSE).
-
-## الدعم 💜
-
-إذا وفّر لك جسور وقتاً، ففكر في دعم التطوير عبر
-[باتريون](https://www.patreon.com/cw/DigitalTrekkerr/membership)، وضع نجمة ⭐
-على المستودع إن وجدته مفيداً.
-
-</div>
