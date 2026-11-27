@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/deferred_temp_file_cleanup.dart';
 import '../widgets/bidi_markdown_view.dart';
+import '../widgets/translated_text_scope.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Detail screen for a single translation record.
@@ -286,7 +287,9 @@ class HistoryDetailScreen extends StatelessWidget {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
+                child: TranslatedTextScope(
                 child: BiDiMarkdownView(markdownText: record.outputText),
+              ),
               ),
             ),
             const SizedBox(height: 32),

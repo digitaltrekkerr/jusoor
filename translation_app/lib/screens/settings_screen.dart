@@ -11,6 +11,7 @@ import '../providers/update_provider.dart';
 import '../services/settings_repository.dart';
 import '../widgets/language_dropdown.dart';
 import '../widgets/selection_modal.dart';
+import '../widgets/text_size_settings_tile.dart';
 import 'api_keys_screen.dart';
 import 'articles_screen.dart';
 import 'instructions_screen.dart';
@@ -167,6 +168,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: _ThemeModeSelector(),
             ),
           ),
+          const SizedBox(height: 8),
+
+          const TextSizeSettingsTile(),
           const SizedBox(height: 8),
 
           TextField(

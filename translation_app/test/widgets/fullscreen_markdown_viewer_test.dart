@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:translation_app/l10n/app_localizations.dart';
+import 'package:translation_app/providers/settings_provider.dart';
 import 'package:translation_app/providers/translation_provider.dart';
 import 'package:translation_app/widgets/fullscreen_markdown_viewer.dart';
 
@@ -29,9 +31,12 @@ void main() {
   late ProviderContainer container;
   late _FakeNotifier notifier;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     notifier = _FakeNotifier();
     container = ProviderContainer(overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
       translationProvider.overrideWith(() => notifier),
     ]);
     container.read(translationProvider);

@@ -1699,6 +1699,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add a new key'**
   String get profileModelAccessAddNew;
+
+  /// Title of the text-size settings row.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get settingsTextSize;
+
+  /// Option: follow the device text size.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsTextSizeSystem;
+
+  /// Subtitle explaining the system option.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the device text size'**
+  String get settingsTextSizeSystemSubtitle;
+
+  /// Title of the text-size settings sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get settingsTextSizeTitle;
+
+  /// Description of the px-based text size setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Size of the app\'s text in px (logical pixels).'**
+  String get settingsTextSizeDescription;
+
+  /// A px value label.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} px'**
+  String settingsTextSizePx(int value);
+
+  /// Label for the live preview in the text-size sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get settingsTextSizePreview;
+
+  /// Nested option: a different size for translation output only.
+  ///
+  /// In en, this message translates to:
+  /// **'Translated text only'**
+  String get settingsTextSizeOutputOnly;
+
+  /// Subtitle for the translated-text-only option.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a different size for the translation output only.'**
+  String get settingsTextSizeOutputOnlySubtitle;
+
+  /// Short label for the output-only size.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} px'**
+  String settingsTextSizeOutputOnlyShort(int value);
+
+  /// Shows the resolved output size.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation output: {value} px'**
+  String settingsTextSizeOutputEffective(int value);
+
+  /// Action that resets both sizes to system.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to system'**
+  String get settingsTextSizeReset;
 }
 
 class _AppLocalizationsDelegate

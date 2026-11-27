@@ -1429,5 +1429,29 @@
   "profileModelAccessAddNew": "إضافة مفتاح جديد",
   "@profileModelAccessAddNew": {
     "description": "خيار يفتح شاشة مفاتيح API لإضافة مفتاح جديد."
-  }
+  },
+  "settingsTextSize": "حجم النص",
+  "@settingsTextSize": {"description": "Title of the text-size settings row."},
+  "settingsTextSizeSystem": "حسب النظام",
+  "@settingsTextSizeSystem": {"description": "Option: follow the device text size."},
+  "settingsTextSizeSystemSubtitle": "يتبع حجم النص في الجهاز",
+  "@settingsTextSizeSystemSubtitle": {"description": "Subtitle explaining the system option."},
+  "settingsTextSizeTitle": "حجم النص",
+  "@settingsTextSizeTitle": {"description": "Title of the text-size settings sheet."},
+  "settingsTextSizeDescription": "حجم نص التطبيق بوحدة px (بكسل منطقي).",
+  "@settingsTextSizeDescription": {"description": "Description of the px-based text size setting."},
+  "settingsTextSizePx": "{value} px",
+  "@settingsTextSizePx": {"description": "A px value label.", "placeholders": {"value": {"type": "int", "example": "16"}}},
+  "settingsTextSizePreview": "معاينة",
+  "@settingsTextSizePreview": {"description": "Label for the live preview in the text-size sheet."},
+  "settingsTextSizeOutputOnly": "النص المترجم فقط",
+  "@settingsTextSizeOutputOnly": {"description": "Nested option: a different size for translation output only."},
+  "settingsTextSizeOutputOnlySubtitle": "حجم مختلف للنص المترجم فقط.",
+  "@settingsTextSizeOutputOnlySubtitle": {"description": "Subtitle for the translated-text-only option."},
+  "settingsTextSizeOutputOnlyShort": "{value} px",
+  "@settingsTextSizeOutputOnlyShort": {"description": "Short label for the output-only size.", "placeholders": {"value": {"type": "int", "example": "26"}}},
+  "settingsTextSizeOutputEffective": "مخرجات الترجمة: {value} px",
+  "@settingsTextSizeOutputEffective": {"description": "Shows the resolved output size.", "placeholders": {"value": {"type": "int", "example": "26"}}},
+  "settingsTextSizeReset": "الرجوع إلى حجم النظام",
+  "@settingsTextSizeReset": {"description": "Action that resets both sizes to system."}
 }

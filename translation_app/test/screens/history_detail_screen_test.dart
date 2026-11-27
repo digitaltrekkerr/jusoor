@@ -1,15 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:history/history.dart';
 import 'package:translation_app/l10n/app_localizations.dart';
+import 'package:translation_app/providers/settings_provider.dart';
 import 'package:translation_app/screens/history_detail_screen.dart';
 
 /// Widget probe for Issue M2: the copy/share bottom sheets on the history
 /// detail screen must render labels from `AppLocalizations` in the active
 /// locale — an English-locale user must see English, never the old
 /// hardcoded Arabic strings.
+late ProviderContainer _container;
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    _container = ProviderContainer(overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+    ]);
+  });
+
+  tearDownAll(() => _container.dispose());
+
   const record = TranslationRecord(
     createdAt: 1700000000000,
     targetLanguage: 'en',
@@ -21,11 +36,14 @@ void main() {
   );
 
   Widget wrapEn(Widget child) {
-    return MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: child,
+    return UncontrolledProviderScope(
+      container: _container,
+      child: MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: child,
+      ),
     );
   }
 

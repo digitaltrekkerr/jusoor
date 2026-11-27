@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/history_provider.dart';
 import 'providers/settings_provider.dart';
+import 'utils/text_size.dart';
 import 'providers/share_intent_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
@@ -106,6 +107,21 @@ class _AppShellState extends ConsumerState<_AppShell> {
         useMaterial3: true,
       ),
       themeMode: themeMode,
+      builder: (context, child) {
+        final px = ref.watch(appTextSizeProvider); // null = System
+        if (px == null) return child ?? const SizedBox.shrink();
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: resolveTextScaler(
+              px: px,
+              basePx: bodyBaseFontPx(Theme.of(context).textTheme),
+              system: mq.textScaler,
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const _MainNavigation(),
     );
   }

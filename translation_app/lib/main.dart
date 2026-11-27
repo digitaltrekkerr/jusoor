@@ -26,7 +26,9 @@ import 'services/deferred_temp_file_cleanup.dart';
 import 'services/settings_repository.dart';
 import 'utils/overlay_template_guard.dart';
 import 'utils/overlay_theme.dart';
+import 'utils/text_size.dart';
 import 'widgets/bidi_markdown_view.dart';
+import 'widgets/translated_text_scope.dart';
 import 'widgets/language_dropdown.dart';
 
 const Color _kSeedColor = Color(0xFF4F46E5);
@@ -210,7 +212,8 @@ class _TranslatorOverlayContent extends StatefulWidget {
       _TranslatorOverlayContentState();
 }
 
-class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
+class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent>
+    with WidgetsBindingObserver {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   String _translatedText = '';
@@ -236,6 +239,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
   bool _isCancelled = false;
   final HistoryService _historyService = HistoryService();
   bool _isFullMode = false;
+  int? _outputTextSizePx;
   bool _needsInitialDetection = true;
 
   /// Aborts the in-flight overlay translation HTTP request when the user
@@ -266,6 +270,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
@@ -279,6 +284,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
 
     _loadDefaultLanguage();
     _loadSizeMode();
+    _loadTextSize();
 
     _inputController.addListener(_onInputChanged);
 
@@ -350,6 +356,9 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
         if (raw != null) {
           widget.themeModeNotifier.value = resolveThemeMode(raw);
         }
+      } else if (map['type'] == 'text_size_changed') {
+        // Live text-size push from the app isolate.
+        _loadTextSize();
       }
     });
   }
@@ -383,6 +392,31 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
       setState(() {
         _isFullMode = mode == 'full';
       });
+    }
+  }
+
+  Future<void> _loadTextSize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final px = resolveOutputTextSizePx(
+        prefs.getInt(SettingsRepository.appTextSizePxKey),
+        prefs.getInt(SettingsRepository.translatedTextSizePxKey),
+      );
+      if (mounted && px != _outputTextSizePx) {
+        setState(() => _outputTextSizePx = px);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Overlay] Failed to load text size: $e');
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadTextSize();
     }
   }
 
@@ -1281,17 +1315,20 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: _translatedText.isNotEmpty
-                        ? BiDiMarkdownView(
-                            markdownText: _translatedText,
-                            selectable: true,
-                            // Route the selection menu's Copy/Share through
-                            // the overlay's own MethodChannel: the overlay
-                            // engine has no PlatformPlugin (no Activity), so
-                            // the framework Clipboard channel would silently
-                            // no-op; `_copyText`/`_shareText` write via the
-                            // Service-context ClipboardManager instead.
-                            onCopy: (text) => _copyText(text),
-                            onShare: (text) => _shareText(text),
+                        ? ExplicitTextSizeScope(
+                            px: _outputTextSizePx,
+                            child: BiDiMarkdownView(
+                              markdownText: _translatedText,
+                              selectable: true,
+                              // Route the selection menu's Copy/Share through
+                              // the overlay's own MethodChannel: the overlay
+                              // engine has no PlatformPlugin (no Activity), so
+                              // the framework Clipboard channel would silently
+                              // no-op; `_copyText`/`_shareText` write via the
+                              // Service-context ClipboardManager instead.
+                              onCopy: (text) => _copyText(text),
+                              onShare: (text) => _shareText(text),
+                            ),
                           )
                         : _isLoading
                         ? const BiDiMarkdownView.loading()
@@ -1570,6 +1607,7 @@ class _TranslatorOverlayContentState extends State<_TranslatorOverlayContent> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _overlaySubscription?.cancel();
     _inputController.dispose();
     _inputFocusNode.dispose();

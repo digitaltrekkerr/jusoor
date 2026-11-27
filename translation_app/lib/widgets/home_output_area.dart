@@ -4,6 +4,7 @@ import 'package:translation_app/l10n/app_localizations.dart';
 import 'package:translation_app/providers/translation_provider.dart';
 import 'package:translation_app/widgets/bidi_markdown_view.dart';
 import 'package:translation_app/widgets/fullscreen_markdown_viewer.dart';
+import 'package:translation_app/widgets/translated_text_scope.dart';
 import 'package:translation_app/widgets/translation_copy_actions.dart';
 
 // ── Output area ──────────────────────────────────────────────────────
@@ -45,7 +46,9 @@ class OutputArea extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            BiDiMarkdownView.streaming(partial: partial, selectable: true),
+            TranslatedTextScope(
+              child: BiDiMarkdownView.streaming(partial: partial, selectable: true),
+            ),
           ],
         ),
         TranslationDone(:final fullText, :final modelUsed, :final durationMs) =>
@@ -78,7 +81,9 @@ class OutputArea extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              BiDiMarkdownView(markdownText: fullText, selectable: true),
+              TranslatedTextScope(
+                child: BiDiMarkdownView(markdownText: fullText, selectable: true),
+              ),
             ],
           ),
         TranslationError(:final message) => Container(

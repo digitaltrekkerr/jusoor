@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:translation_core/translation_core.dart';
 
 import '../services/settings_repository.dart';
+import '../utils/text_size.dart';
 
 /// Provides the [FlutterSecureStorage] singleton.
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
@@ -78,6 +79,86 @@ class WordLimitNotifier extends Notifier<int> {
     await repo.setWordLimit(value);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// ── Text Size ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Reactive state for the app-wide text size in px (`null` = System).
+final appTextSizeProvider = NotifierProvider<AppTextSizeNotifier, int?>(
+  AppTextSizeNotifier.new,
+);
+
+/// Notifier that manages the app-wide text size and persists changes.
+class AppTextSizeNotifier extends Notifier<int?> {
+  @override
+  int? build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    return repo.appTextSizePx;
+  }
+
+  /// Updates the text size in memory and persists it (`null` = System).
+  Future<void> set(int? px) async {
+    state = clampTextSizePx(px);
+    final repo = ref.read(settingsRepositoryProvider);
+    await repo.setAppTextSizePx(state);
+    try {
+      unawaited(
+        FlutterOverlayWindow.shareData({
+          'type': 'text_size_changed',
+        }).catchError((Object e) {
+          debugPrint('[AppTextSize] Failed to notify overlay: $e');
+          return null;
+        }),
+      );
+    } catch (e) {
+      debugPrint('[AppTextSize] Failed to notify overlay: $e');
+    }
+  }
+}
+
+/// Reactive state for the translated-output-only text size in px
+/// (`null` = inherit).
+final translatedTextSizeProvider =
+    NotifierProvider<TranslatedTextSizeNotifier, int?>(
+  TranslatedTextSizeNotifier.new,
+);
+
+/// Notifier that manages the translated-output-only text size.
+class TranslatedTextSizeNotifier extends Notifier<int?> {
+  @override
+  int? build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    return repo.translatedTextSizePx;
+  }
+
+  /// Updates the output-only text size in memory and persists it.
+  Future<void> set(int? px) async {
+    state = clampTextSizePx(px);
+    final repo = ref.read(settingsRepositoryProvider);
+    await repo.setTranslatedTextSizePx(state);
+    try {
+      unawaited(
+        FlutterOverlayWindow.shareData({
+          'type': 'text_size_changed',
+        }).catchError((Object e) {
+          debugPrint('[TranslatedTextSize] Failed to notify overlay: $e');
+          return null;
+        }),
+      );
+    } catch (e) {
+      debugPrint('[TranslatedTextSize] Failed to notify overlay: $e');
+    }
+  }
+}
+
+/// Effective output px: output override, else global, else null (system).
+final resolvedOutputTextSizeProvider = Provider<int?>((ref) {
+  return resolveOutputTextSizePx(
+    ref.watch(appTextSizeProvider),
+    ref.watch(translatedTextSizeProvider),
+  );
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // ── API Keys ─────────────────────────────────────────────────────────

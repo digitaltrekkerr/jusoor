@@ -901,4 +901,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileModelAccessAddNew => 'Add a new key';
+
+  @override
+  String get settingsTextSize => 'Text size';
+
+  @override
+  String get settingsTextSizeSystem => 'System';
+
+  @override
+  String get settingsTextSizeSystemSubtitle => 'Follow the device text size';
+
+  @override
+  String get settingsTextSizeTitle => 'Text size';
+
+  @override
+  String get settingsTextSizeDescription =>
+      'Size of the app\'s text in px (logical pixels).';
+
+  @override
+  String settingsTextSizePx(int value) {
+    return '$value px';
+  }
+
+  @override
+  String get settingsTextSizePreview => 'Preview';
+
+  @override
+  String get settingsTextSizeOutputOnly => 'Translated text only';
+
+  @override
+  String get settingsTextSizeOutputOnlySubtitle =>
+      'Use a different size for the translation output only.';
+
+  @override
+  String settingsTextSizeOutputOnlyShort(int value) {
+    return '$value px';
+  }
+
+  @override
+  String settingsTextSizeOutputEffective(int value) {
+    return 'Translation output: $value px';
+  }
+
+  @override
+  String get settingsTextSizeReset => 'Reset to system';
 }
