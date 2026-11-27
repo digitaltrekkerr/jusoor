@@ -121,8 +121,8 @@ class AppTextSizeNotifier extends Notifier<int?> {
 /// (`null` = inherit).
 final translatedTextSizeProvider =
     NotifierProvider<TranslatedTextSizeNotifier, int?>(
-  TranslatedTextSizeNotifier.new,
-);
+      TranslatedTextSizeNotifier.new,
+    );
 
 /// Notifier that manages the translated-output-only text size.
 class TranslatedTextSizeNotifier extends Notifier<int?> {

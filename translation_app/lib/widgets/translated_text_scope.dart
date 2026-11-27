@@ -33,7 +33,11 @@ class TranslatedTextScope extends ConsumerWidget {
 /// Same effect as [TranslatedTextScope] but with an explicit resolved px
 /// (used by the overlay engine, which has no Riverpod container).
 class ExplicitTextSizeScope extends StatelessWidget {
-  const ExplicitTextSizeScope({super.key, required this.px, required this.child});
+  const ExplicitTextSizeScope({
+    super.key,
+    required this.px,
+    required this.child,
+  });
 
   final int? px;
   final Widget child;

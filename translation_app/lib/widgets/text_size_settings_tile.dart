@@ -102,134 +102,145 @@ class _TextSizeSheetState extends ConsumerState<_TextSizeSheet> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                Text(l10n.settingsTextSizeTitle,
-                    style: theme.textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(l10n.settingsTextSizeDescription,
-                    style: theme.textTheme.bodySmall),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.settingsTextSizeSystem),
-                  subtitle: Text(l10n.settingsTextSizeSystemSubtitle),
-                  value: _global == null,
-                  onChanged: (on) {
-                    if (on) {
-                      _setGlobal(null);
-                    } else {
-                      _setGlobal(_global ?? 16);
-                    }
-                  },
-                ),
-                if (_global != null) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          min: kTextSizeMinPx.toDouble(),
-                          max: kTextSizeMaxPx.toDouble(),
-                          divisions: kTextSizeMaxPx - kTextSizeMinPx,
-                          value: _global!.toDouble(),
-                          label: '$_global px',
-                          onChanged: (v) => _setGlobal(v.round()),
+                        Text(
+                          l10n.settingsTextSizeTitle,
+                          style: theme.textTheme.titleLarge,
                         ),
-                      ),
-                      SizedBox(
-                        width: 96,
-                        child: _PxField(
-                          value: _global!,
-                          onChanged: _setGlobal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ExplicitTextSizeScope(
-                    px: _global,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        l10n.settingsTextSizePreview,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                  ),
-                  ExplicitTextSizeScope(
-                    px: _global,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        'Preview معاينة',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SwitchListTile.adaptive(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(l10n.settingsTextSizeOutputOnly),
-                        subtitle:
-                            Text(l10n.settingsTextSizeOutputOnlySubtitle),
-                        value: _output != null,
-                        onChanged: (on) {
-                          if (on) {
-                            _setOutput(_output ?? _global ?? 16);
-                          } else {
-                            _setOutput(null);
-                          }
-                        },
-                      ),
-                      if (_output != null) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Slider(
-                                min: kTextSizeMinPx.toDouble(),
-                                max: kTextSizeMaxPx.toDouble(),
-                                divisions: kTextSizeMaxPx - kTextSizeMinPx,
-                                value: _output!.toDouble(),
-                                label: '$_output px',
-                                onChanged: (v) => _setOutput(v.round()),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 96,
-                              child: _PxField(
-                                value: _output!,
-                                onChanged: _setOutput,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(l10n.settingsTextSizeOutputEffective(_output!)),
                         const SizedBox(height: 4),
-                        ExplicitTextSizeScope(
-                          px: _output,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(
-                              l10n.settingsTextSizePreview,
-                              style: theme.textTheme.bodyMedium,
+                        Text(
+                          l10n.settingsTextSizeDescription,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(l10n.settingsTextSizeSystem),
+                          subtitle: Text(l10n.settingsTextSizeSystemSubtitle),
+                          value: _global == null,
+                          onChanged: (on) {
+                            if (on) {
+                              _setGlobal(null);
+                            } else {
+                              _setGlobal(_global ?? 16);
+                            }
+                          },
+                        ),
+                        if (_global != null) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Slider(
+                                  min: kTextSizeMinPx.toDouble(),
+                                  max: kTextSizeMaxPx.toDouble(),
+                                  divisions: kTextSizeMaxPx - kTextSizeMinPx,
+                                  value: _global!.toDouble(),
+                                  label: '$_global px',
+                                  onChanged: (v) => _setGlobal(v.round()),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 96,
+                                child: _PxField(
+                                  value: _global!,
+                                  onChanged: _setGlobal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ExplicitTextSizeScope(
+                            px: _global,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(
+                                l10n.settingsTextSizePreview,
+                                style: theme.textTheme.bodyMedium,
+                              ),
                             ),
                           ),
+                          ExplicitTextSizeScope(
+                            px: _global,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(
+                                'Preview معاينة',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Divider(),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(l10n.settingsTextSizeOutputOnly),
+                                subtitle: Text(
+                                  l10n.settingsTextSizeOutputOnlySubtitle,
+                                ),
+                                value: _output != null,
+                                onChanged: (on) {
+                                  if (on) {
+                                    _setOutput(_output ?? _global ?? 16);
+                                  } else {
+                                    _setOutput(null);
+                                  }
+                                },
+                              ),
+                              if (_output != null) ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Slider(
+                                        min: kTextSizeMinPx.toDouble(),
+                                        max: kTextSizeMaxPx.toDouble(),
+                                        divisions:
+                                            kTextSizeMaxPx - kTextSizeMinPx,
+                                        value: _output!.toDouble(),
+                                        label: '$_output px',
+                                        onChanged: (v) => _setOutput(v.round()),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 96,
+                                      child: _PxField(
+                                        value: _output!,
+                                        onChanged: _setOutput,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  l10n.settingsTextSizeOutputEffective(
+                                    _output!,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                ExplicitTextSizeScope(
+                                  px: _output,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(
+                                      l10n.settingsTextSizePreview,
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 12),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: TextButton(
