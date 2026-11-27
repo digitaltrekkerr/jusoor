@@ -6,11 +6,6 @@ import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
 import '../services/settings_repository.dart';
 
-/// Default system prompt used by the application.
-const _kDefaultSystemPrompt =
-    'You are a professional translator. Translate the given text to '
-    '{{target_language}}. Preserve the original formatting and structure.';
-
 /// Screen for creating or editing a single prompt template.
 ///
 /// When [template] is `null`, a new template is created. When provided,
@@ -91,7 +86,9 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? l10n.tplEditExistingTitle : l10n.tplEditNewTitle),
+        title: Text(
+          _isEditing ? l10n.tplEditExistingTitle : l10n.tplEditNewTitle,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -214,7 +211,8 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     final original = template == null
         ? null
         : SettingsRepository.builtInSystemPromptFor(template.id);
-    _systemPromptController.text = original ?? _kDefaultSystemPrompt;
+    _systemPromptController.text =
+        original ?? SettingsRepository.systemPromptTemplate;
     setState(() {});
   }
 
