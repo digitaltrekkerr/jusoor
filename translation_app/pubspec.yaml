@@ -1,5 +1,5 @@
 name: translation_app
-version: 0.1.10+2019
+version: 0.1.11+2020
 resolution: workspace
 
 publish_to: 'none'
