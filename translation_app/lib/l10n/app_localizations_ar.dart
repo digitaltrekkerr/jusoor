@@ -909,4 +909,48 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileModelAccessAddNew => 'إضافة مفتاح جديد';
+
+  @override
+  String get settingsTextSize => 'حجم النص';
+
+  @override
+  String get settingsTextSizeSystem => 'حسب النظام';
+
+  @override
+  String get settingsTextSizeSystemSubtitle => 'يتبع حجم النص في الجهاز';
+
+  @override
+  String get settingsTextSizeTitle => 'حجم النص';
+
+  @override
+  String get settingsTextSizeDescription =>
+      'حجم نص التطبيق بوحدة px (بكسل منطقي).';
+
+  @override
+  String settingsTextSizePx(int value) {
+    return '$value px';
+  }
+
+  @override
+  String get settingsTextSizePreview => 'معاينة';
+
+  @override
+  String get settingsTextSizeOutputOnly => 'النص المترجم فقط';
+
+  @override
+  String get settingsTextSizeOutputOnlySubtitle =>
+      'حجم مختلف للنص المترجم فقط.';
+
+  @override
+  String settingsTextSizeOutputOnlyShort(int value) {
+    return '$value px';
+  }
+
+  @override
+  String settingsTextSizeOutputEffective(int value) {
+    return 'مخرجات الترجمة: $value px';
+  }
+
+  @override
+  String get settingsTextSizeReset => 'الرجوع إلى حجم النظام';
 }

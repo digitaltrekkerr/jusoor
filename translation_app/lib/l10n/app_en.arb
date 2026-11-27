@@ -1429,5 +1429,29 @@
   "profileModelAccessAddNew": "Add a new key",
   "@profileModelAccessAddNew": {
     "description": "Option that opens the API keys screen to add a new key."
-  }
+  },
+  "settingsTextSize": "Text size",
+  "@settingsTextSize": {"description": "Title of the text-size settings row."},
+  "settingsTextSizeSystem": "System",
+  "@settingsTextSizeSystem": {"description": "Option: follow the device text size."},
+  "settingsTextSizeSystemSubtitle": "Follow the device text size",
+  "@settingsTextSizeSystemSubtitle": {"description": "Subtitle explaining the system option."},
+  "settingsTextSizeTitle": "Text size",
+  "@settingsTextSizeTitle": {"description": "Title of the text-size settings sheet."},
+  "settingsTextSizeDescription": "Size of the app's text in px (logical pixels).",
+  "@settingsTextSizeDescription": {"description": "Description of the px-based text size setting."},
+  "settingsTextSizePx": "{value} px",
+  "@settingsTextSizePx": {"description": "A px value label.", "placeholders": {"value": {"type": "int", "example": "16"}}},
+  "settingsTextSizePreview": "Preview",
+  "@settingsTextSizePreview": {"description": "Label for the live preview in the text-size sheet."},
+  "settingsTextSizeOutputOnly": "Translated text only",
+  "@settingsTextSizeOutputOnly": {"description": "Nested option: a different size for translation output only."},
+  "settingsTextSizeOutputOnlySubtitle": "Use a different size for the translation output only.",
+  "@settingsTextSizeOutputOnlySubtitle": {"description": "Subtitle for the translated-text-only option."},
+  "settingsTextSizeOutputOnlyShort": "{value} px",
+  "@settingsTextSizeOutputOnlyShort": {"description": "Short label for the output-only size.", "placeholders": {"value": {"type": "int", "example": "26"}}},
+  "settingsTextSizeOutputEffective": "Translation output: {value} px",
+  "@settingsTextSizeOutputEffective": {"description": "Shows the resolved output size.", "placeholders": {"value": {"type": "int", "example": "26"}}},
+  "settingsTextSizeReset": "Reset to system",
+  "@settingsTextSizeReset": {"description": "Action that resets both sizes to system."}
 }

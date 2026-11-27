@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:translation_core/translation_core.dart';
+import 'package:translation_app/utils/text_size.dart';
 
 /// Lightweight metadata entry for a named API key.
 ///
@@ -76,6 +77,15 @@ class SettingsRepository {
   /// engine that cannot build a repository — it has no secure storage) can
   /// read the same setting directly.
   static const themeModeKey = 'theme_mode';
+
+  /// SharedPreferences key storing the app-wide text size in px. Absent =
+  /// System (follows the OS scale). Public so the overlay engine can read it.
+  static const appTextSizePxKey = 'text_size_px';
+
+  /// SharedPreferences key storing the translated-output-only text size in
+  /// px. Absent = inherit (global, then system). Public so the overlay
+  /// engine can read it.
+  static const translatedTextSizePxKey = 'translated_text_size_px';
 
   // ── Pre-built profile IDs ──────────────────────────────────────────
   static const _openrouterDefaultProfileId = 'openrouter_default_profile';
@@ -240,6 +250,54 @@ class SettingsRepository {
 
   /// Persists the word limit.
   Future<void> setWordLimit(int value) => _prefs.setInt(_wordLimitKey, value);
+
+  /// Returns the app-wide text size in px, or `null` for System.
+  ///
+  /// Tolerates corrupt prefs (non-int stored values) by returning `null`
+  /// and dropping the bogus key, mirroring [getAllProfiles]'s tolerance.
+  int? get appTextSizePx {
+    try {
+      return clampTextSizePx(_prefs.getInt(appTextSizePxKey));
+    } catch (_) {
+      try {
+        _prefs.remove(appTextSizePxKey);
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  /// Persists the app-wide text size in px (`null` removes the pref).
+  Future<void> setAppTextSizePx(int? px) async {
+    final clamped = clampTextSizePx(px);
+    if (clamped == null) {
+      await _prefs.remove(appTextSizePxKey);
+    } else {
+      await _prefs.setInt(appTextSizePxKey, clamped);
+    }
+  }
+
+  /// Returns the translated-output-only text size in px, or `null` for
+  /// inherit (global, then system).
+  int? get translatedTextSizePx {
+    try {
+      return clampTextSizePx(_prefs.getInt(translatedTextSizePxKey));
+    } catch (_) {
+      try {
+        _prefs.remove(translatedTextSizePxKey);
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  /// Persists the translated-output-only text size in px (`null` removes).
+  Future<void> setTranslatedTextSizePx(int? px) async {
+    final clamped = clampTextSizePx(px);
+    if (clamped == null) {
+      await _prefs.remove(translatedTextSizePxKey);
+    } else {
+      await _prefs.setInt(translatedTextSizePxKey, clamped);
+    }
+  }
 
   /// Returns the overlay size mode, defaulting to [OverlaySizeMode.compressed].
   OverlaySizeMode get overlaySizeMode {

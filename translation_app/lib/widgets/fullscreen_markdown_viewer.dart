@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:translation_app/l10n/app_localizations.dart';
 import 'package:translation_app/providers/translation_provider.dart';
 import 'package:translation_app/widgets/bidi_markdown_view.dart';
+import 'package:translation_app/widgets/translated_text_scope.dart';
 import 'package:translation_app/widgets/translation_copy_actions.dart';
 
 /// Read-only, selectable, full-screen view of the current translation.
@@ -54,13 +55,17 @@ class FullscreenMarkdownViewer extends ConsumerWidget {
     if (state is TranslationStreaming) {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: BiDiMarkdownView.streaming(partial: state.partial, selectable: true),
+        child: TranslatedTextScope(
+          child: BiDiMarkdownView.streaming(partial: state.partial, selectable: true),
+        ),
       );
     }
     if (state is TranslationDone) {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: BiDiMarkdownView(markdownText: state.fullText, selectable: true),
+        child: TranslatedTextScope(
+          child: BiDiMarkdownView(markdownText: state.fullText, selectable: true),
+        ),
       );
     }
     if (state is TranslationError) {
